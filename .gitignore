@@ -1,0 +1,7 @@
+# DS Store Files
+*.DS_Store
+# Data Folder - Ignore due to size of data files
+*Data/*
+# Ignore Jupyter checkpoints
+*.ipynb_checkpoints
+*__pycache__
