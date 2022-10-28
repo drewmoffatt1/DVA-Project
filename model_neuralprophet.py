@@ -1,4 +1,4 @@
-from neuralprophet import NeuralProphet, set_random_seed
+from neuralprophet import NeuralProphet, set_random_seed, save, load
 # from model_prophet import load_data##, eval_model
 import pandas as pd
 import numpy as np
@@ -33,7 +33,7 @@ def train_model(df1):
     metrics = model.fit(df_train, freq="H", validation_df=df_test)
 
     ## save results
-    torch.save(model.model.state_dict(), 'checkpoints/np_lag24_AR_weights'+df1.zone.values[0]+'.pth')
+    save(model, 'checkpoints/np_lag24_AR_weights'+df1.zone.values[0]+'.pth')
     metrics['zone'] = df1.zone.values[0]
     metrics.to_csv("checkpoints/metrics_"+df1.zone.values[0]+'.csv')
     return metrics
@@ -61,3 +61,20 @@ if __name__ == "__main__":
     # ).toPandas()
 
     res.to_csv("checkpoints/np_metrics_results.csv")
+
+    ## eval model
+    test_res=[]
+    for z in DF.zone.unique():
+        df1 = DF.loc[DF.zone==z]
+        df1s = df1[["ds", "y", "temp", "rh", "pressure", "windspeed", "rain", "snow"]]
+        df1s.loc[:, "rain"] = df1s["rain"].astype(int)
+        df1s.loc[:, "snow"] = df1s["snow"].astype(int)
+        model = load("checkpoints/np_lag24_AR_weights_"+z+".pth")
+        pred1 = model.predict(df1s)
+        pred1 = pd.merge(df1, pred1, on="ds")
+        test1 = pred1.loc[pred1.test==1]
+        res1 = mape(test1.y_x, test1.yhat1)
+        test_res.append(res1)
+
+    res_df = pd.DataFrame({"zone":DF.zone.unique(), "mape": test_res})
+    res_df.to_csv("checkpoints/test_mape_zones.csv")
