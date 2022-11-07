@@ -7,7 +7,6 @@ from pyspark.sql.functions import col
 from datetime import datetime, timedelta
 import dash_leaflet as dl
 import dash_bootstrap_components as dbc
-import plotly.graph_objects as go
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 spark = SparkSession.builder.getOrCreate()
@@ -24,12 +23,23 @@ def update_data(zone):
     df1 = df.filter((col("zone") == zone) & (col("dt") > date_ext) & (col("dt") <= today)).toPandas()
     return df1
 
+def get_info(zone=None):
+    return [html.P(zone)]
 
-dfm = px.data.gapminder().query("year==2007")
-fig_map = px.scatter_geo(dfm, locations="iso_alpha", color="continent",
-                     hover_name="country", size="pop",
-                     projection="natural earth")
+info = html.Div(children=get_info(), id="info", className="info", style={"position": "absolute", "top": "10px", "right": "10px", "z-index": "1000"})
 
+tab1 = dbc.Card(
+    dbc.CardBody([
+        html.Div([dcc.Graph(id="load")])
+    ]),
+    className="mt-3"
+)
+tab2 = dbc.Card(
+    dbc.CardBody([
+        html.Div([dcc.Graph(id="temp")])
+    ]),
+    className="mt-3"
+)
 
 app.layout = dbc.Container([
     dbc.Row([html.H1(children="Energy Load prediction"),
@@ -47,29 +57,29 @@ app.layout = dbc.Container([
         dbc.Col([
             ## plot energy/temp curve
             dbc.Row([
-                dbc.Col([html.Div([
-                    dcc.Graph(id="load", style={"height": "30%"})
-                ])], width=5),
-                dbc.Col([html.Div([
-                    dcc.Graph(id="temp", style={"height": "30%"})
-                ])], width=5)
+                dbc.Tabs([
+                    dbc.Tab(tab1, label="Load"),
+                    dbc.Tab(tab2, label="Temp")
+                ])
             ]),
             dbc.Row(
                 html.Div([
                    #dcc.Graph(figure=fig_map)
-                    dl.Map(children=[dl.TileLayer(url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"),
-                                     dl.LocateControl()],
-                           style={'width': "100%", 'height': "100%"}, center=[55.5, 10.5], zoom=8),
+                    dl.Map(children=[dl.TileLayer(), info],center=[39, -98], zoom=4,
+                           style={'width': "100%", 'height': "100%"}),
                 ], style={'width': '1000px', 'height': '500px'})
             )
-            ## plot choropleth map
-            # dbc.Row(html.Div([
-            #     dcc.Graph(id="map")
-            # ]))
         ], width=True)
-    ])
+    ]),
+    dbc.Row(html.Br())
 ])
 
+@app.callback(
+    Output("info", "children"),
+    Input("Zone", "value")
+)
+def update_map(zone):
+    return get_info(zone)
 
 @app.callback(
     Output("load", "figure"),
@@ -77,7 +87,8 @@ app.layout = dbc.Container([
 )
 def update_load(zone):
     df1 = update_data(zone)
-    fig = px.line(df1, "dt", "mw", markers=True)
+    fig = px.line(df1, "dt", "mw", markers=True, width=950, height=300, template="plotly_white")
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
 
 @app.callback(
@@ -86,18 +97,10 @@ def update_load(zone):
 )
 def update_temp(zone):
     df1 = update_data(zone)
-    fig = px.line(df1, "dt", "temp", markers=True)
+    fig = px.line(df1, "dt", "temp", markers=True, width=950, height=300, template="plotly_white")
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
 
-
-
-# @app.callback(
-#     Output("map", "figure"),
-#     Input("Zone", "value")
-# )
-# def update_map(zone):
-#     fig = dl.TileLayer()
-#     return fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
