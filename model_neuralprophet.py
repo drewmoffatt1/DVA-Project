@@ -16,7 +16,7 @@ import itertools
 
 ## AR-Net
 def run_model(df1):
-    df1s = df1[["ds", "y", "temp", "rh", "pressure", "windspeed", "rain", "snow"]]
+    df1s = df1[["ds", "y", "temp", "precip", "rh", "pressure", "windspeed", "rain", "snow"]]
     df1s.loc[:, "rain"] = df1s["rain"].astype(int)
     df1s.loc[:, "snow"] = df1s["snow"].astype(int)
 
@@ -48,13 +48,22 @@ def run_model(df1):
     tres['mape'] = m1
     tres['zone'] = df1.zone.values[0]
     idx = m1.index(min(m1))
-    save(mdlist[idx], 'checkpoints_f24/np_f24_'+df1.zone.values[0]+'.pth')
-    mtlist[idx].to_csv("checkpoints_f24/metrics_f24_"+df1.zone.values[0]+'.csv')
-    Res = tres.iloc[[idx], ]    
+
+    # save(mdlist[idx], 'checkpoints_f24/np_f24_'+df1.zone.values[0]+'.pth')
+    # mtlist[idx].to_csv("checkpoints_f24/metrics_f24_"+df1.zone.values[0]+'.csv')
+    # Res = tres.iloc[[idx], ]
+
+    ## train with full dataset
+    model, mt = train_model(df1, all_params[idx])    
+    save(model, 'checkpoints_f24/np_f24_'+df1.zone.values[0]+'.pth')
+    mt.to_csv("checkpoints_f24/metrics_f24_"+df1.zone.values[0]+'.csv')
+
+    Res = tres.iloc[[idx], ]
+    
     return Res
 
 def train_model(df1, params):
-    df1s = df1[["ds", "y", "temp", "rh", "pressure", "windspeed", "rain", "snow"]]
+    df1s = df1[["ds", "y", "temp", "rh", "precip", "pressure", "windspeed", "rain", "snow"]]
     df1s.loc[:, "rain"] = df1s["rain"].astype(int)
     df1s.loc[:, "snow"] = df1s["snow"].astype(int)
 
