@@ -22,11 +22,8 @@ def load_history(file):
     hrl = hrl[hrl['zone'].isin(zmap['zone'])]
     return hrl
 
-def filter_pred(hrl, model='neuralprophet'):
-    zone_s = st.sidebar.multiselect('Zones:', hrl.zone.unique(), default='AE')
-    if len(zone_s) == 0:
-        zone_s = ['AE']
-
+@st.experimental_memo
+def filter_pred(hrl, zone_s, model='neuralprophet'):
     preds = []
     for zone in zone_s:
         dat = pjm_load(hrl, zone=zone)
@@ -36,7 +33,6 @@ def filter_pred(hrl, model='neuralprophet'):
     pred_subset = pd.concat(preds)
     
     return pred_subset, zone_s
-
 
 ## add geo
 def time_select(hrl, date_s, hour):
@@ -73,20 +69,27 @@ def load_data():
 
 zmap, peak = load_data()
 
+###########
 ## side bar
 uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
-st.sidebar.caption("(Note: PJM metered load can be downloaded from: https://dataminer2.pjm.com/feed/hrl_load_metered. Data from 2022/11/01 to 2022/11/07 are preloaded.)")
+st.sidebar.caption("(Note: PJM metered load can be downloaded from: https://dataminer2.pjm.com/feed/hrl_load_metered. Data from 2022/11/01 to 2022/11/07 are preloaded for demo.)")
 
 if uploaded_file is not None:
     hrl = load_history(uploaded_file)
 else:
     hrl = load_history('Data/hrl_load_metered_7.csv')
 
-pred_subset, zone_s = filter_pred(hrl, model='neuralprophet')
-#st.experimental_show(pred_subset)
-if pred_subset.shape[0] > 0:
-    st.sidebar.success('Model prediction finished!', icon="✅")
+zone_s = st.sidebar.multiselect('Zones:', hrl.zone.unique(), default='AEP')
+if len(zone_s) == 0:
+    zone_s = ['AEP']
 
+model = st.sidebar.selectbox('Choose model:',
+                             ('XGBoost', 'neuralprophet', 'ANN', 'RandomForest', 'TransferFunction'),
+                             index=1)
+pred_subset, zone_s = filter_pred(hrl, zone_s, model=model)
+#st.experimental_show(pred_subset)
+
+#st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## filter by date and hour
 start_date = hrl['ds'].min().date()
 end_date = hrl['ds'].max().date()
@@ -98,15 +101,24 @@ hist_h = z_selected(hist_h, zone_s)
 hist_h = scale_color(hist_h)
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
-## curves
-col1, col2 = st.columns(2)
+#st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+## status
+if uploaded_file is not None:
+    st.sidebar.text('Data uploaded!')
+if pred_subset.shape[0] > 0:
+    st.sidebar.success('Prediction on ' + zone_s[-1] + ' finished!', icon="✅")
 
+
+#########
+## main
+col1, col2 = st.columns(2)
 with col1:
     st.write('Load Forecast')
     fig1 = px.line(pred_subset, x='ds', y='y', color='zone', line_dash='source',
                     markers=True, template="plotly_white", log_y=True, 
                     height=200)
-    fig1.update_layout(margin={"t":0,"b":0, "l":0, "r":0}, hovermode="x unified")
+    fig1.update_layout(margin={"t":0,"b":0, "l":0, "r":0}, hovermode="x unified",
+                       xaxis_title=None, yaxis_title="Load")
     fig1.update_yaxes(gridcolor='lightgrey')
     pred_date = end_date + timedelta(1)
     fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash", line_width=1, line_color='red')
@@ -119,7 +131,8 @@ with col2:
                     markers=True, template="plotly_white", log_y=True,
                     hover_data=['rh', 'pressure', 'windspeed', 'rain', 'snow'],
                     height=200)
-    fig2.update_layout(margin={"t":0,"b":0, "l":0, "r":0})
+    fig2.update_layout(margin={"t":0,"b":0, "l":0, "r":0},
+                       xaxis_title=None, yaxis_title="temperature")
     fig2.update_yaxes(gridcolor='lightgrey')
     fig2.add_vline(x=time_s, line_dash="dash")
     st.plotly_chart(fig2, use_container_width=True)
