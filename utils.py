@@ -44,9 +44,10 @@ def pjm_load(hrl, zone='AE'):
     hrl1 = hrl[hrl['zone'] == zone]
     dat1 = pd.merge(hrl1, wf1, on='ds', how='outer')
     dat1 = dat1.rename(
-        columns={"mw": "y", "temperature_2m": "temp", "relativehumidity_2m": "rh", "surface_pressure": "pressure",
+        columns={"mw": "y", "temperature_2m": "temp", "relativehumidity_2m": "rh",
+                 "precipitation": "precip", "surface_pressure": "pressure",
                 "windspeed_10m": "windspeed", "snowfall": "snow"})
-    dat1 = dat1[["ds", "y", "temp", "rh", "pressure", "windspeed", "rain", "snow"]]
+    dat1 = dat1[["ds", "y", "temp", "precip", "rh", "pressure", "windspeed", "rain", "snow"]]
     dat1['rain'] = np.where(dat1['rain'] > 0, 1, 0)
     dat1['snow'] = np.where(dat1['snow'] > 0, 1, 0)
 
@@ -64,7 +65,7 @@ def model_predict(zone, dat, model='neuralprophet'):
     ## prediction
     p1=m.predict(dat, raw=True, decompose=False)
     dat.y[-24:] = p1.iloc[-1].iloc[1:].astype('double')
-    dat["source"] = "JPM"
+    dat["source"] = "PJM"
     dat.source[-24:] = "pred"
     return dat
 
