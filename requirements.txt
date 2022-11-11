@@ -3,6 +3,6 @@ pandas==1.5.1
 plotly==5.10.0
 pydeck==0.8.0
 streamlit==1.14.0
-neuralprophet==0.4.1
 requests==2.28.1
 torch==1.12.1
+git+https://github.com/ourownstory/neural_prophet@0.4.2
