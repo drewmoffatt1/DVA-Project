@@ -5,7 +5,9 @@ import pydeck as pdk
 import plotly.figure_factory as ff
 import plotly.express as px
 import plotly.colors
-from utils import weather_forcast, load_model, pjm_load, model_predict
+# from utils import weather_forcast, load_model, pjm_load, model_predict
+from model_np import ModelNP
+from model_xgb import ModelXGB
 from datetime import timedelta
 import datetime
 
@@ -24,11 +26,17 @@ def load_history(file):
 
 
 @st.experimental_memo
-def filter_pred(hrl, zone_s, model='neuralprophet'):
+def filter_pred(zone_s, hrl=None, date=None, model='neuralprophet'):
     preds = []
     for zone in zone_s:
-        dat = pjm_load(hrl, zone=zone)
-        p = model_predict(zone, dat, model)
+        if model == 'neuralprophet':
+            m = ModelNP(zone)
+            p = m.predict(hrl)
+        elif model == 'XGBoost':
+            m = ModelXGB(zone)
+            p = m.predict(date.strftime('%Y-%m-%d'))
+        else:
+            return 'Not implemented'
         p['zone'] = zone
         preds.append(p)
     pred_subset = pd.concat(preds)
@@ -47,7 +55,7 @@ def scale_color(hist_h):
     Reds = plotly.colors.PLOTLY_SCALES["RdBu"]
     # plotly.colors.find_intermediate_color(YR[0][1], YR[-1][1], 0.5, colortype='rgb')
 
-    hist_h = pd.merge(hist_h, peak, on='zone')
+    # hist_h = pd.merge(hist_h, zmap, on='zone')
     pct = hist_h['mw'].values / hist_h['hist_peak_mw'].values
     hist_h['color'] = [
         plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color(Reds[0][1], Reds[-1][1], p, colortype='rgb'))
@@ -60,7 +68,7 @@ def z_selected(hist_h, zone_s):
     selected = []
     for z in hist_h['zone']:
         if z in zone_s:
-            selected.append([0, 0, 255])
+            selected.append([255, 127, 0])
         else:
             selected.append([255, 255, 255])
     hist_h['selected'] = selected
@@ -69,50 +77,68 @@ def z_selected(hist_h, zone_s):
 
 @st.experimental_memo
 def load_data():
-    zmap = pd.read_csv('Data/zone_mapping.csv')
-    peak = pd.read_csv('Data/peak_hour_forecast.csv')[['zone', 'hist_peak_mw']]
-    return zmap, peak
+    zmap = pd.read_csv('Data/zone_mapping_hist_peak.csv')
+    #peak = pd.read_csv('Data/peak_hour_forecast.csv')[['zone', 'hist_peak_mw']]
+    return zmap
 
 
-zmap, peak = load_data()
+zmap = load_data()
 
 ###########
 ## side bar
-uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
-st.sidebar.caption(
-    "(Note: PJM metered load can be downloaded from: https://dataminer2.pjm.com/feed/hrl_load_metered. Data from 2022/11/01 to 2022/11/07 are preloaded for demo.)")
-
-if uploaded_file is not None:
-    hrl = load_history(uploaded_file)
-else:
-    hrl = load_history('Data/hrl_load_metered_7.csv')
-
-zone_s = st.sidebar.multiselect('Zones:', hrl.zone.unique(), default='AEP')
-if len(zone_s) == 0:
-    zone_s = ['AEP']
-
 model = st.sidebar.selectbox('Choose model:',
                              ('XGBoost', 'neuralprophet', 'ANN', 'RandomForest', 'TransferFunction'),
                              index=1)
-pred_subset, zone_s = filter_pred(hrl, zone_s, model=model)
+
+if model=='neuralprophet':
+    uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
+    st.sidebar.caption(
+        "(Note: PJM metered load can be downloaded from: https://dataminer2.pjm.com/feed/hrl_load_metered. Data from 2022/11/01 to 2022/11/07 are preloaded for demo.)")
+
+    if uploaded_file is not None:
+        hrl = load_history(uploaded_file)
+    else:
+        hrl = load_history('Data/hrl_load_metered_7.csv')
+
+    start_date = hrl['ds'].min().date()
+    end_date = hrl['ds'].max().date()
+    date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date + timedelta(1))
+elif model=='XGBoost':
+    date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
+else:
+    st.error('Not implemented!')
+
+zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default='AEP')
+if len(zone_s) == 0:
+    zone_s = ['AEP']
+
+
+hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=12)
+
+## model prediction
+if model == 'neuralprophet':
+    pred_subset, zone_s = filter_pred(zone_s, hrl=hrl, model='neuralprophet')
+    pred_subset = pred_subset.rename(columns={'y': 'mw'})
+    hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
+    # data for map
+    hist_h = time_select(hrl, date_s, hour)
+elif model == 'XGBoost':
+    pred_subset, zone_s = filter_pred(zone_s, date=date_s, model='XGBoost')
+    pred_subset['ds'] = pd.to_datetime(pred_subset['date']) + pred_subset['hour'].astype('timedelta64[h]')
+    pred_subset['source'] = 'pred'
+    # data for map
+    hist_h = time_select(pred_subset, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
+else:
+    st.error('Not implemented!')
 # st.experimental_show(pred_subset)
 
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
-## filter by date and hour
-start_date = hrl['ds'].min().date()
-end_date = hrl['ds'].max().date()
-date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date)
-hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=12)
-
-hist_h = time_select(hrl, date_s, hour)
 hist_h = z_selected(hist_h, zone_s)
 hist_h = scale_color(hist_h)
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## status
-if uploaded_file is not None:
-    st.sidebar.text('Data uploaded!')
 if pred_subset.shape[0] > 0:
     st.sidebar.success('Prediction on ' + zone_s[-1] + ' finished!', icon="✅")
 
@@ -122,21 +148,22 @@ col1, col2 = st.columns(2)
 with col1:
     st.write('Load Forecast')
     try:
-        fig1 = px.line(pred_subset, x='ds', y='y', color='zone', symbol='source',
+        fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
                        symbol_map={"PJM": "circle", "pred": "x"},
                        markers=True, template="plotly_white", log_y=True,
                        height=200)
     except Exception:
-        fig1 = px.line(pred_subset, x='ds', y='y', color='zone', symbol='source',
+        fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
                        symbol_map={"PJM": "circle", "pred": "x"},
                        markers=True, template="plotly_white", log_y=True,
                        height=200)
     fig1.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0}, hovermode="x unified",
                        xaxis_title=None, yaxis_title="Load")
     fig1.update_yaxes(gridcolor='lightgrey')
-    pred_date = end_date + timedelta(1)
-    fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash",
-                   line_width=1, line_color='red')
+    if model == 'neuralprophet':
+        pred_date = end_date + timedelta(1)
+        fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash",
+                       line_width=1, line_color='red')
     fig1.add_vline(x=time_s, line_dash="dash")
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -154,7 +181,7 @@ with col2:
 
 ## Load map
 # st.experimental_show(hist_h)
-st.write("Load map (" + time_s.strftime('%Y-%m-%d %H') + ")")
+st.write("Load map (" + time_s.strftime('%Y-%m-%d %H:%M:%S') + ")")
 L1 = pdk.Layer(
     'ScatterplotLayer',
     data=hist_h,
