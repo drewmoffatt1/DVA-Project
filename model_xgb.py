@@ -174,6 +174,8 @@ class ModelXGB:
         x = df8[['year', 'weekend', 'holiday', 'is_dst', 'is_sah', 'precovid',
            'postcovid', 'temp', 'precip', 'rh', 'pressure', 'windspeed', 'rain', 'snow',
            'recent', 'hour_cos', 'hour_sin', 'month_cos', 'month_sin', 'dow_num']].copy()
+        x['rain'] = x['rain'].astype('bool')
+        x['snow'] = x['snow'].astype('bool')
         return result_df, x
 
 
@@ -189,29 +191,5 @@ class ModelXGB:
         return result_df
 
 
-# hrl = pd.read_csv('Data/hrl_load_metered_7.csv')
-# m1 = ModelNP('AEP')
-# p1 = m1.predict(hrl)
-# mape(p1[p1['source']=='pred']['y'], hrl1['mw'])
-#
 # m2 = ModelXGB('AEP')
-# p2 = m2.predict('2022-11-08')
-# mape(p2['mw'], hrl1['mw'])
-
-# r1 = get_zone_hourly_forecast('2022-11-08', 'AEP')
-# hrl1 = pd.read_csv('~/Downloads/hrl_load_metered_AEP.csv')
-# hrl1['ds'] = pd.to_datetime(hrl1['datetime_beginning_ept'])
-# hrl1 = hrl1.groupby(['ds', 'zone']).agg({'mw': 'sum'}).reset_index()
-# from sklearn.metrics import mean_absolute_percentage_error as mape
-# mape(r1['mw'], hrl1['mw'])
-#
-#
-# hrl['ds'] = pd.to_datetime(hrl['datetime_beginning_ept'])
-# hrl = hrl.groupby(['ds', 'zone']).agg({'mw': 'sum'}).reset_index()
-# dat = pjm_load(hrl, 'AEP')
-# r2 = model_predict('AEP', dat)
-# mape(r2[r2['source']=='pred']['y'], hrl1['mw'])
-#
-# hrl_e = pd.read_csv('~/Downloads/hrl_load_estimated_AEP.csv')
-# mape(hrl_e['estimated_load_hourly'], hrl1['mw'])
-
+# m2.predict('2022-10-08')
