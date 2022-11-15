@@ -7,7 +7,7 @@
 
 ### To Use Application
 1. Clone repo
-2. Execute productionalized_model/forecastPJM.py to create new PJM forecast
+2. Navigate to productionalized_model and execute forecastPJM.py file to create new PJM forecast
 3. Open pjm-forecast-viz.tbw
 4. Open the Data Source window in Tableau
 5. Right-click the small carrot to the right of the hourly forecast connection
