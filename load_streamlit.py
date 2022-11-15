@@ -59,14 +59,19 @@ def time_select(hrl, date_s, hour):
 
 ## scale color by load
 def scale_color(hist_h):
-    Reds = plotly.colors.PLOTLY_SCALES["RdBu"]
-    # plotly.colors.find_intermediate_color(YR[0][1], YR[-1][1], 0.5, colortype='rgb')
+    #Reds = plotly.colors.PLOTLY_SCALES["RdBu"]
 
-    # hist_h = pd.merge(hist_h, zmap, on='zone')
     pct = hist_h['mw'].values / hist_h['hist_peak_mw'].values
-    hist_h['color'] = [
-        plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color(Reds[0][1], Reds[-1][1], p, colortype='rgb'))
-        for p in pct]
+    
+    cls = []
+    for p in pct:
+        if p <= 0.5:
+            cl = plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color('rgb(0,128,0)', 'rgb(190,190,190)', p/0.5, colortype='rgb'))
+        else:
+            cl = plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color('rgb(190,190,190)', 'rgb(250,0,0)', (p-0.5)/0.5, colortype='rgb'))
+        cls.append(cl)
+    hist_h['color'] = cls
+
     return hist_h
 
 
@@ -131,10 +136,8 @@ if model == 'neuralprophet':
     # data for map
     hist_h = time_select(hrl, date_s, hour)
 elif model == 'XGBoost':
-    # pred_subset, zone_s = forecasting(zone_s, date=date_s, model='XGBoost')
     pred_all['ds'] = pd.to_datetime(pred_all['date']) + pred_all['hour'].astype('timedelta64[h]')
     pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
-    # pred_subset['ds'] = pd.to_datetime(pred_subset['date']) + pred_subset['hour'].astype('timedelta64[h]')
     pred_subset['source'] = 'pred'
     # data for map
     hist_h = time_select(pred_all, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
@@ -157,7 +160,7 @@ elif pred_subset.shape[0] > 0:
 
 #########
 ## main
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
     st.write('Load Forecast')
     try:
@@ -171,13 +174,15 @@ with col1:
                        markers=True, template="plotly_white", log_y=True,
                        height=200)
     fig1.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0}, hovermode="x unified",
-                       xaxis_title=None, yaxis_title="Load")
+                       xaxis_title=None, yaxis_title="Load",
+                       legend=dict(orientation="h"))
     fig1.update_yaxes(gridcolor='lightgrey')
     if model == 'neuralprophet':
         pred_date = end_date + timedelta(1)
         fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash",
                        line_width=1, line_color='red')
     fig1.add_vline(x=time_s, line_dash="dash")
+
     st.plotly_chart(fig1, use_container_width=True)
 
 with col2:
@@ -188,10 +193,28 @@ with col2:
                    hover_data=['rh', 'precip', 'pressure', 'windspeed', 'rain', 'snow'],
                    height=200)
     fig2.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0},
-                       xaxis_title=None, yaxis_title="temperature")
+                       xaxis_title=None, yaxis_title="temperature",
+                       legend=dict(orientation="h"))
     fig2.update_yaxes(gridcolor='lightgrey')
     fig2.add_vline(x=time_s, line_dash="dash")
     st.plotly_chart(fig2, use_container_width=True)
+
+with col3:
+    mw1 = pred_subset[(pred_subset['ds']==time_s) & (pred_subset['zone']==zone_s[-1])]['mw']
+    if hour >= 1:
+        mw0 = pred_subset[(pred_subset['ds']==(time_s-timedelta(hours=1))) & (pred_subset['zone']==zone_s[-1])]['mw']
+        delta_mw = str(round(mw1.values[0]-mw0.values[0], 1))
+    else:
+        delta_mw = ''
+    st.metric('Load ('+zone_s[-1]+')', str(round(mw1.values[0], 1)), delta_mw)
+
+    tmp1 = pred_subset[(pred_subset['ds']==time_s) & (pred_subset['zone']==zone_s[-1])]['temp']
+    if hour >= 1:
+        tmp0 = pred_subset[(pred_subset['ds']==(time_s-timedelta(hours=1))) & (pred_subset['zone']==zone_s[-1])]['temp']
+        delta_t = round(tmp1.values[0]-tmp0.values[0], 1)
+    else:
+        delta_t = ''
+    st.metric('Temperature ('+zone_s[-1]+')', str(tmp1.values[0])+' °F', delta_t)
 
 ## Load map
 # st.experimental_show(hist_h)
