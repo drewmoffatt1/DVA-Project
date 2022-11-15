@@ -166,10 +166,12 @@ def create_analysis_df(zone, zones_dict, base_df):
     df8 = base_df.merge(df2, on='datetime', how='left')
     result_df = df8[['date', 'hour', 'temp']].copy()
     result_df['zone'] = zone
+    historical_df = df8[['date', 'hour', 'temp', 'precip','pressure','windspeed','rain','snow']].copy()
+    historical_df['zone'] = zone
     x = df8[['year', 'weekend', 'holiday', 'is_dst', 'is_sah', 'precovid',
        'postcovid', 'temp', 'precip', 'rh', 'pressure', 'windspeed', 'rain', 'snow',
        'recent', 'hour_cos', 'hour_sin', 'month_cos', 'month_sin', 'dow_num']].copy()
-    return result_df, x
+    return result_df, x, historical_df
 
 def get_hourly_forecast():
     ## run base dataset
@@ -194,7 +196,7 @@ def get_hourly_forecast():
 
 def output_data():
     ## run models to get hourly predictions
-    hourly_forecast = get_hourly_forecast()
+    hourly_forecast, historical_df = get_hourly_forecast()
     
     ## bring in zone data for the historical peak data
     zzz = pd.read_csv('models/zone_mapping_hist_peak.csv')
@@ -220,11 +222,12 @@ def output_data():
     system.columns = ['hour', 'system_mw', 'peak_hour']
     
     ## return 3 datasets
-    return peak_forecast, hourly_forecast, system
+    return peak_forecast, hourly_forecast, system, historical_df
 
-peak_forecast, hourly_forecast, system = output_data()
+peak_forecast, hourly_forecast, system, historical_df = output_data()
 
 ## export each to csv (or change this if proceeding with live solution)
 peak_forecast.to_csv('output/peak_hour_forecast.csv', index = False)
 hourly_forecast.to_csv('output/hourly_forecast.csv', index = False)
 system.to_csv('output/system_hourly_forecast.csv', index = False)
+historical_df.to_csv('output/historical_data.csv', mode='a', header=False, index=False)
