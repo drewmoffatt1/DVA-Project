@@ -4,6 +4,7 @@ import requests
 import json
 import datetime as dt
 import xgboost as xgb
+import sklearn
 
 def get_date():
     return (dt.date.today() + dt.timedelta(days=1)).strftime('%Y-%m-%d')
@@ -122,7 +123,7 @@ def api_weather_forecast(zone, zones_dict):
                             '&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch' + \
                             '&timezone=America%2FNew_York' + \
                             '&start_date=' + strdate + \
-                            '&end_date=' + strdate
+                            '&end_date=' + strdate,verify=False
                            )
 
     forecast = response.json()
