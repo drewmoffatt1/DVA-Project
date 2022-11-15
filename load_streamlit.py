@@ -15,7 +15,7 @@ st.set_page_config(layout="wide")
 
 
 ## load data
-@st.experimental_memo
+@st.cache
 def load_history(file):
     hrl = pd.read_csv(file)
     hrl['ds'] = pd.to_datetime(hrl['datetime_beginning_ept'])
@@ -24,11 +24,13 @@ def load_history(file):
     hrl = hrl[hrl['zone'].isin(zmap['zone'])]
     return hrl
 
-
-@st.experimental_memo
-def filter_pred(zone_s, hrl=None, date=None, model='neuralprophet'):
+@st.cache(allow_output_mutation=True, suppress_st_warning=True)
+def forecasting(zones, hrl=None, date=None, model='XGBoost'):
     preds = []
-    for zone in zone_s:
+
+    my_bar = st.sidebar.progress(0)
+    pct = 0
+    for zone in zones:
         if model == 'neuralprophet':
             m = ModelNP(zone)
             p = m.predict(hrl)
@@ -39,9 +41,14 @@ def filter_pred(zone_s, hrl=None, date=None, model='neuralprophet'):
             return 'Not implemented'
         p['zone'] = zone
         preds.append(p)
+
+        pct += 1/len(zones)
+        if pct >= 1:
+            pct = 1
+        my_bar.progress(pct)
     pred_subset = pd.concat(preds)
 
-    return pred_subset, zone_s
+    return pred_subset
 
 
 ## add geo
@@ -75,20 +82,20 @@ def z_selected(hist_h, zone_s):
     return hist_h
 
 
-@st.experimental_memo
+@st.cache
 def load_data():
     zmap = pd.read_csv('Data/zone_mapping_hist_peak.csv')
+    zones = zmap['zone'].unique()
     #peak = pd.read_csv('Data/peak_hour_forecast.csv')[['zone', 'hist_peak_mw']]
-    return zmap
+    return zmap, zones
 
-
-zmap = load_data()
+zmap, zones = load_data()
 
 ###########
 ## side bar
 model = st.sidebar.selectbox('Choose model:',
-                             ('XGBoost', 'neuralprophet', 'ANN', 'RandomForest', 'TransferFunction'),
-                             index=1)
+                             ('XGBoost', 'neuralprophet'),
+                             index=0)
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
@@ -105,6 +112,7 @@ if model=='neuralprophet':
     date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date + timedelta(1))
 elif model=='XGBoost':
     date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
+    pred_all = forecasting(zones, date=date_s, model='XGBoost')
 else:
     st.error('Not implemented!')
 
@@ -117,17 +125,19 @@ hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=12)
 
 ## model prediction
 if model == 'neuralprophet':
-    pred_subset, zone_s = filter_pred(zone_s, hrl=hrl, model='neuralprophet')
+    pred_subset = forecasting(zone_s, hrl=hrl, model='neuralprophet')
     pred_subset = pred_subset.rename(columns={'y': 'mw'})
     hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
     # data for map
     hist_h = time_select(hrl, date_s, hour)
 elif model == 'XGBoost':
-    pred_subset, zone_s = filter_pred(zone_s, date=date_s, model='XGBoost')
-    pred_subset['ds'] = pd.to_datetime(pred_subset['date']) + pred_subset['hour'].astype('timedelta64[h]')
+    # pred_subset, zone_s = forecasting(zone_s, date=date_s, model='XGBoost')
+    pred_all['ds'] = pd.to_datetime(pred_all['date']) + pred_all['hour'].astype('timedelta64[h]')
+    pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
+    # pred_subset['ds'] = pd.to_datetime(pred_subset['date']) + pred_subset['hour'].astype('timedelta64[h]')
     pred_subset['source'] = 'pred'
     # data for map
-    hist_h = time_select(pred_subset, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
+    hist_h = time_select(pred_all, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
 else:
     st.error('Not implemented!')
 # st.experimental_show(pred_subset)
@@ -139,8 +149,11 @@ time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## status
-if pred_subset.shape[0] > 0:
-    st.sidebar.success('Prediction on ' + zone_s[-1] + ' finished!', icon="✅")
+if model == 'XGBoost':
+    if pred_all.shape[0] > 0:
+        st.sidebar.success('Forecasting on all zones finished!', icon="✅")
+elif pred_subset.shape[0] > 0:
+    st.sidebar.success('Forecasting on ' + zone_s[-1] + ' finished!', icon="✅")
 
 #########
 ## main
@@ -169,6 +182,7 @@ with col1:
 
 with col2:
     st.write('Weather Forecast')
+    pred_subset['pressure'] = round(pred_subset['pressure'], 4)
     fig2 = px.line(pred_subset, x='ds', y='temp', color='zone',
                    markers=True, template="plotly_white", log_y=True,
                    hover_data=['rh', 'precip', 'pressure', 'windspeed', 'rain', 'snow'],
