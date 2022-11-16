@@ -19,7 +19,7 @@
 
 
 ### 2. To Update Forecast
-1. Within the ```DVA-Project``` folder, execute ```forecastPJM.py``` file to create new PJM forecast output files
+1. Within the ```DVA-Project``` folder, execute ```forecastPJMLoad.py``` file to create new PJM forecast output files
 2. In the Tableau tool (```DVA-Project/PJM Load Forecast Visualizer.twb```), navigate to the top menu and select ```Data>Refresh All Extracts...``` and click 'Refresh' in the pop-up
     
     <img width="485" alt="Refresh-data" src="https://user-images.githubusercontent.com/116284163/202313386-f3e7c0e3-1204-4fda-acd2-1da6bbb809e6.png">
