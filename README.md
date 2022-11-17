@@ -4,6 +4,7 @@
 ### Prerequisites
 1. Tableau Desktop
 2. Python 3.X
+3. Packages: pandas, numpy, requests, json, datetime, xgboost, sklearn
 
 ## To Use Application
 ### 1. To Link Tableau Viz to Data Sources
