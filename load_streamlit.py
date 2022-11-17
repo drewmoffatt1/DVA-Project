@@ -189,6 +189,7 @@ def color_map(hist_h, i):
                            caption='step')
     return step(hist_h.loc[i, 'mw'])
 
+
 m = folium.Map([40, -80], zoom_start=6)
 locations = list(zip(hist_h['lat'], hist_h['long']))
 for i in range(len(zones)):
@@ -228,7 +229,13 @@ if click_out['last_object_clicked'] is not None:
 
 col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
-    st.write('Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
+    # st.write('Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
+    pidx = pred_all['mw'].argmax()
+    st.write('Load Forecast (Peak: {} on {} at {}H)'.format(
+        str(round(pred_all.iloc[pidx]['mw'], 2)),
+        pred_all.iloc[pidx]['zone'],
+        pred_all.iloc[pidx]['ds'].strftime('%Y-%m-%d %H')
+    ))
     try:
         fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
                        symbol_map={"PJM": "circle", "pred": "x"},
