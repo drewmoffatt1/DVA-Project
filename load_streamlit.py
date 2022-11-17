@@ -1,15 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pydeck as pdk
-import plotly.figure_factory as ff
+# import pydeck as pdk
+# import plotly.figure_factory as ff
 import plotly.express as px
 import plotly.colors
-# from utils import weather_forcast, load_model, pjm_load, model_predict
 from model_np import ModelNP
 from model_xgb import ModelXGB
 from datetime import timedelta
 import datetime
+import folium
+from streamlit_folium import st_folium
+import branca.colormap as cm
 
 st.set_page_config(layout="wide")
 
@@ -115,54 +117,118 @@ if model=='neuralprophet':
     start_date = hrl['ds'].min().date()
     end_date = hrl['ds'].max().date()
     date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date + timedelta(1))
+    pred_all = forecasting(zones, hrl=hrl, model='neuralprophet')
+    pred_all = pred_all.rename(columns={'y': 'mw'})
 elif model=='XGBoost':
     date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
     pred_all = forecasting(zones, date=date_s, model='XGBoost')
 else:
     st.error('Not implemented!')
 
-zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default='AEP')
+
+zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
 if len(zone_s) == 0:
     zone_s = ['AEP']
 
 
-hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=12)
-
-## model prediction
-if model == 'neuralprophet':
-    pred_subset = forecasting(zone_s, hrl=hrl, model='neuralprophet')
-    pred_subset = pred_subset.rename(columns={'y': 'mw'})
-    hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
-    # data for map
-    hist_h = time_select(hrl, date_s, hour)
-elif model == 'XGBoost':
-    pred_all['ds'] = pd.to_datetime(pred_all['date']) + pred_all['hour'].astype('timedelta64[h]')
-    pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
-    pred_subset['source'] = 'pred'
-    # data for map
-    hist_h = time_select(pred_all, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
-else:
-    st.error('Not implemented!')
-# st.experimental_show(pred_subset)
-
-# st.sidebar.markdown("<hr>", unsafe_allow_html=True)
-hist_h = z_selected(hist_h, zone_s)
-hist_h = scale_color(hist_h)
+hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")))
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
+
+def update_by_zone_date(zones, date_s, hrl=None):
+    ## model prediction
+    if model == 'neuralprophet':
+        # pred_subset = forecasting(zone_s, hrl=hrl, model='neuralprophet')
+        # pred_subset = pred_subset.rename(columns={'y': 'mw'})
+        pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
+        hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
+        # data for map
+        hist_h = time_select(hrl, date_s, hour)
+    elif model == 'XGBoost':
+        pred_all['ds'] = pd.to_datetime(pred_all['date']) + pred_all['hour'].astype('timedelta64[h]')
+        pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
+        pred_subset['source'] = 'pred'
+        # data for map
+        hist_h = time_select(pred_all, date_s, hour)[['zone', 'mw', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
+    else:
+        st.error('Not implemented!')
+    # st.experimental_show(pred_subset)
+    pred_max = pred_all.groupby('zone').agg({'mw': max}).reset_index()
+    pred_max = pred_max.rename(columns={'mw': 'mw_max'})
+    hist_h = hist_h.merge(pred_max, on='zone')
+
+    # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+    hist_h = z_selected(hist_h, zone_s)
+    # hist_h = scale_color(hist_h)
+    hist_h['mw'] = round(hist_h['mw'], 2)
+
+    return pred_subset, hist_h
 
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## status
 if model == 'XGBoost':
-    if pred_all.shape[0] > 0:
+    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=None)
+    if pred_subset.shape[0] > 0:
         st.sidebar.success('Forecasting on all zones finished!', icon="✅")
-elif pred_subset.shape[0] > 0:
-    st.sidebar.success('Forecasting on ' + zone_s[-1] + ' finished!', icon="✅")
+elif model == 'neuralprophet':
+    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=hrl)
+    if pred_subset.shape[0] > 0:
+        st.sidebar.success('Forecasting on ' + zone_s[-1] + ' finished!', icon="✅")
 
 #########
 ## main
+
+def linear_scale(x):
+    sc = (x - min(x)) / (max(x) - min(x))
+    return sc * 40 + 10
+
+rad = linear_scale(hist_h['mw']).values
+
+def color_map(hist_h, i):
+    step = cm.StepColormap(['green', 'yellow', 'red'],
+                           vmin=0, vmax=hist_h.loc[i, 'hist_peak_mw'],
+                           caption='step')
+    return step(hist_h.loc[i, 'mw'])
+
+m = folium.Map([40, -80], zoom_start=6)
+locations = list(zip(hist_h['lat'], hist_h['long']))
+for i in range(len(zones)):
+    if zones[i] in zone_s:
+        op = 0.8
+    else:
+        op = 0.4
+    folium.CircleMarker(location=locations[i], radius=int(rad[i]), fill=True,
+                        color=color_map(hist_h, i), fill_opacity=op,
+                        tooltip="{}({})<br>Load ({}H): {}<br>Peak Load: {}<br>{}% of historical peak".format(
+                            hist_h.loc[i, 'full_zone_name'],
+                            hist_h.loc[i, 'zone'],
+                            str(hour),
+                            str(hist_h.loc[i, 'mw']),
+                            str(hist_h.loc[i, 'mw_max']),
+                            round(hist_h.loc[i, 'mw']/hist_h.loc[i, 'hist_peak_mw']*100, 2)
+    )).add_to(m)
+
+click_out = st_folium(m, width=1400, height=500, returned_objects=['last_object_clicked'])
+
+if 'zone_m' not in st.session_state.keys():
+    st.session_state.zone_m = zone_s.copy()
+if click_out['last_object_clicked'] is not None:
+    zidx = (abs(zmap['lat'] - click_out['last_object_clicked']['lat']) + abs(zmap['long'] - click_out['last_object_clicked']['lng'])).argmin()
+    zone_co = zmap.loc[zidx, 'zone']
+    if not zone_co in st.session_state.zone_m:
+        st.session_state.zone_m.append(zone_co)
+        zone_s = st.session_state.zone_m.copy()
+    else:
+        st.session_state.zone_m.remove(zone_co)
+        zone_s = st.session_state.zone_m.copy()
+    # else:
+    #     st.session_state.tmp.remove(zone_co)
+    #     zone_s = st.session_state.tmp
+
+    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=None)
+
 col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
-    st.write('Load Forecast')
+    st.write('Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
     try:
         fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
                        symbol_map={"PJM": "circle", "pred": "x"},
@@ -206,7 +272,7 @@ with col3:
         delta_mw = str(round(mw1.values[0]-mw0.values[0], 1))
     else:
         delta_mw = ''
-    st.metric('Load ('+zone_s[-1]+')', str(round(mw1.values[0], 1)), delta_mw)
+    st.metric('Load ('+zone_s[-1]+' at '+ str(hour)+'H)', str(round(mw1.values[0], 1)), delta_mw)
 
     tmp1 = pred_subset[(pred_subset['ds']==time_s) & (pred_subset['zone']==zone_s[-1])]['temp']
     if hour >= 1:
@@ -218,34 +284,43 @@ with col3:
 
 ## Load map
 # st.experimental_show(hist_h)
-st.write("Load map (" + time_s.strftime('%Y-%m-%d %H:%M:%S') + ")")
-L1 = pdk.Layer(
-    'ScatterplotLayer',
-    data=hist_h,
-    pickable=True,
-    stroked=True,
-    filled=True,
-    opacity=0.8,
-    radius_scale=6,
-    radius_min_pixels=1,
-    radius_max_pixels=100,
-    line_width_min_pixels=2,
-    get_position='[long, lat]',
-    get_fill_color='color',
-    get_line_color='selected',
-    get_radius="mw",
-)
+# st.write("Load map (" + time_s.strftime('%Y-%m-%d %H:%M:%S') + ")")
+# L1 = pdk.Layer(
+#     'ScatterplotLayer',
+#     data=hist_h,
+#     pickable=True,
+#     stroked=True,
+#     filled=True,
+#     opacity=0.8,
+#     radius_scale=5,
+#     radius_min_pixels=20,
+#     radius_max_pixels=100,
+#     line_width_min_pixels=2,
+#     get_position='[long, lat]',
+#     get_fill_color='color',
+#     get_line_color='selected',
+#     get_radius="mw",
+# )
+#
+# st.pydeck_chart(
+#     pdk.Deck(
+#         map_style=None,
+#         initial_view_state=pdk.ViewState(
+#             latitude=40,
+#             longitude=-80.00,
+#             zoom=5,
+#             pitch=0,
+#             height=700
+#         ),
+#         layers=[L1],
+#         tooltip={"text": "{full_zone_name}({zone})\nLoad: {mw}"}),
+#     use_container_width=True)
 
-st.pydeck_chart(
-    pdk.Deck(
-        map_style=None,
-        initial_view_state=pdk.ViewState(
-            latitude=40,
-            longitude=-80.00,
-            zoom=5,
-            pitch=0,
-            height=700
-        ),
-        layers=[L1],
-        tooltip={"text": "{full_zone_name}({zone})\nLoad: {mw}"}),
-    use_container_width=True)
+
+
+# if not 'CE' in zone_s:
+#     st.session_state.zone_k.append('CE')
+
+# st.write(st.session_state)
+#
+# st.write(zone_s)
