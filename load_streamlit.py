@@ -14,7 +14,7 @@ from streamlit_folium import st_folium
 import branca.colormap as cm
 
 st.set_page_config(layout="wide")
-st.markdown('<style>.main .block-container {padding-top: 2rem;}</style>', unsafe_allow_html=True)
+st.markdown('<style>.main .block-container {padding-top: 2rem; padding-bottom: 0rem}</style>', unsafe_allow_html=True)
 
 ## load data
 @st.cache
@@ -125,10 +125,16 @@ elif model=='XGBoost':
 else:
     st.error('Not implemented!')
 
+container = st.sidebar.container()
+all = st.sidebar.checkbox("Select all")
+if all:
+    zone_s = container.multiselect("Select zones:", zmap.zone.unique(), default=zmap.zone.unique(), key='zone_k')
+else:
+    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
 
-zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
-if len(zone_s) == 0:
-    zone_s = ['AEP']
+# zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
+# if len(zone_s) == 0:
+#     zone_s = ['AEP']
 
 
 hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")))
@@ -190,7 +196,7 @@ def color_map(hist_h, i):
     return step(hist_h.loc[i, 'mw'])
 
 pidx = pred_all['mw'].argmax()
-st.markdown('Load Peak: {} on **{}** at _{}H_)'.format(
+st.markdown('Load Peak: {} on **{}** at _{}H_'.format(
     str(round(pred_all.iloc[pidx]['mw'], 2)),
     pred_all.iloc[pidx]['zone'],
     pred_all.iloc[pidx]['ds'].strftime('%Y-%m-%d %H')
@@ -237,15 +243,27 @@ col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
     st.write('Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
     try:
-        fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
-                       symbol_map={"PJM": "circle", "pred": "x"},
-                       markers=True, template="plotly_white", log_y=True,
-                       height=200)
+        if model == 'neuralprophet':
+            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
+                           symbol_map={"PJM": "circle", "pred": "x"},
+                           markers=True, template="plotly_white", log_y=True,
+                           height=200)
+        else:
+            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone',
+                           symbol_map={"PJM": "circle", "pred": "x"},
+                           markers=True, template="plotly_white", log_y=True,
+                           height=200)
     except Exception:
-        fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
-                       symbol_map={"PJM": "circle", "pred": "x"},
-                       markers=True, template="plotly_white", log_y=True,
-                       height=200)
+        if model == 'neuralprophet':
+            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
+                           symbol_map={"PJM": "circle", "pred": "x"},
+                           markers=True, template="plotly_white", log_y=True,
+                           height=200)
+        else:
+            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone',
+                           symbol_map={"PJM": "circle", "pred": "x"},
+                           markers=True, template="plotly_white", log_y=True,
+                           height=200)
     fig1.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0}, hovermode="x unified",
                        xaxis_title=None, yaxis_title="Load",
                        legend=dict(orientation="h"))
