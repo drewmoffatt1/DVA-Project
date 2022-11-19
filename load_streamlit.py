@@ -60,25 +60,6 @@ def time_select(hrl, date_s, hour):
     hist_h = hrl[(hrl['ds'].dt.date == date_s) & (hrl['ds'].dt.hour == int(hour))]
     return hist_h.merge(zmap, on='zone')
 
-
-## scale color by load
-# def scale_color(hist_h):
-#     #Reds = plotly.colors.PLOTLY_SCALES["RdBu"]
-#
-#     pct = hist_h['mw'].values / hist_h['hist_peak_mw'].values
-#
-#     cls = []
-#     for p in pct:
-#         if p <= 0.5:
-#             cl = plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color('rgb(0,128,0)', 'rgb(190,190,190)', p/0.5, colortype='rgb'))
-#         else:
-#             cl = plotly.colors.unlabel_rgb(plotly.colors.find_intermediate_color('rgb(190,190,190)', 'rgb(250,0,0)', (p-0.5)/0.5, colortype='rgb'))
-#         cls.append(cl)
-#     hist_h['color'] = cls
-#
-#     return hist_h
-
-
 ## highlight selected
 def z_selected(hist_h, zone_s):
     selected = []
@@ -121,6 +102,7 @@ if model=='neuralprophet':
     date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date + timedelta(1))
     pred_all = forecasting(zones, hrl=hrl, model='neuralprophet')
     pred_all = pred_all.rename(columns={'y': 'mw'})
+    pred_all['hour'] = pred_all['ds'].dt.hour
 elif model=='XGBoost':
     date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
     try:
@@ -136,8 +118,7 @@ all = st.sidebar.checkbox("Select all", value=True)
 if all:
     zone_s = container.multiselect("Select zones:", zmap.zone.unique(), default=zmap.zone.unique(), key='zone_k')
 else:
-    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
-
+    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=['AEP'], key='zone_k')
 # zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
 # if len(zone_s) == 0:
 #     zone_s = ['AEP']
@@ -146,13 +127,13 @@ else:
 hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")))
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
-def update_by_zone_date(zones, date_s, hrl=None):
+def update_by_zone_date(zone_s, date_s, hrl=None):
     ## model prediction
     if model == 'neuralprophet':
         # pred_subset = forecasting(zone_s, hrl=hrl, model='neuralprophet')
         # pred_subset = pred_subset.rename(columns={'y': 'mw'})
         pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
-        hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
+        hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw', 'temp']]], axis=0)
         # data for map
         hist_h = time_select(hrl, date_s, hour)
     elif model == 'XGBoost':
@@ -182,11 +163,11 @@ def update_by_zone_date(zones, date_s, hrl=None):
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## status
 if model == 'XGBoost':
-    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=None)
+    pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=None)
     if pred_subset.shape[0] > 0:
         st.sidebar.success('Forecasting on all zones finished!', icon="✅")
 elif model == 'neuralprophet':
-    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=hrl)
+    pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=hrl)
     if pred_subset.shape[0] > 0:
         st.sidebar.success('Forecasting on ' + zone_s[-1] + ' finished!', icon="✅")
 
@@ -252,22 +233,25 @@ colormap.add_to(m)
 
 click_out = st_folium(m, width=1300, height=500, returned_objects=['last_object_clicked'])
 
+if (not all) and (len(st.session_state.zone_m) == 21):
+    st.session_state.pop('zone_m', None)
+    zone_s = ['AEP']
+
 if 'zone_m' not in st.session_state.keys():
     st.session_state.zone_m = zone_s.copy()
+
 if click_out['last_object_clicked'] is not None:
     zidx = (abs(zmap['lat'] - click_out['last_object_clicked']['lat']) + abs(zmap['long'] - click_out['last_object_clicked']['lng'])).argmin()
     zone_co = zmap.loc[zidx, 'zone']
+
     if not zone_co in st.session_state.zone_m:
         st.session_state.zone_m.append(zone_co)
         zone_s = st.session_state.zone_m.copy()
     else:
         st.session_state.zone_m.remove(zone_co)
         zone_s = st.session_state.zone_m.copy()
-    # else:
-    #     st.session_state.tmp.remove(zone_co)
-    #     zone_s = st.session_state.tmp
 
-    pred_subset, hist_h = update_by_zone_date(zones, date_s, hrl=None)
+    pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=None)
 
 col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
@@ -361,54 +345,3 @@ with col3:
     else:
         delta_mw = ''
     st.metric('Last selected ('+zone_s[-1]+' '+ str(hour)+'H)', str(round(mw1.values[0], 1)), delta_mw)
-
-    # tmp1 = pred_subset[(pred_subset['ds']==time_s) & (pred_subset['zone']==zone_s[-1])]['temp']
-    # if hour >= 1:
-    #     tmp0 = pred_subset[(pred_subset['ds']==(time_s-timedelta(hours=1))) & (pred_subset['zone']==zone_s[-1])]['temp']
-    #     delta_t = round(tmp1.values[0]-tmp0.values[0], 1)
-    # else:
-    #     delta_t = ''
-    # st.metric('Temperature ('+zone_s[-1]+')', str(tmp1.values[0])+' °F', delta_t)
-
-## Load map
-# st.experimental_show(hist_h)
-# st.write("Load map (" + time_s.strftime('%Y-%m-%d %H:%M:%S') + ")")
-# L1 = pdk.Layer(
-#     'ScatterplotLayer',
-#     data=hist_h,
-#     pickable=True,
-#     stroked=True,
-#     filled=True,
-#     opacity=0.8,
-#     radius_scale=5,
-#     radius_min_pixels=20,
-#     radius_max_pixels=100,
-#     line_width_min_pixels=2,
-#     get_position='[long, lat]',
-#     get_fill_color='color',
-#     get_line_color='selected',
-#     get_radius="mw",
-# )
-#
-# st.pydeck_chart(
-#     pdk.Deck(
-#         map_style=None,
-#         initial_view_state=pdk.ViewState(
-#             latitude=40,
-#             longitude=-80.00,
-#             zoom=5,
-#             pitch=0,
-#             height=700
-#         ),
-#         layers=[L1],
-#         tooltip={"text": "{full_zone_name}({zone})\nLoad: {mw}"}),
-#     use_container_width=True)
-
-
-
-# if not 'CE' in zone_s:
-#     st.session_state.zone_k.append('CE')
-
-# st.write(st.session_state)
-#
-# st.write(zone_s)
