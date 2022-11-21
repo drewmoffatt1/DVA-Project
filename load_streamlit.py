@@ -60,18 +60,6 @@ def time_select(hrl, date_s, hour):
     hist_h = hrl[(hrl['ds'].dt.date == date_s) & (hrl['ds'].dt.hour == int(hour))]
     return hist_h.merge(zmap, on='zone')
 
-## highlight selected
-def z_selected(hist_h, zone_s):
-    selected = []
-    for z in hist_h['zone']:
-        if z in zone_s:
-            selected.append([255, 127, 0])
-        else:
-            selected.append([255, 255, 255])
-    hist_h['selected'] = selected
-    return hist_h
-
-
 @st.cache
 def load_data():
     zmap = pd.read_csv('Data/zone_mapping_hist_peak.csv')
@@ -97,49 +85,68 @@ if model=='neuralprophet':
     else:
         hrl = load_history('Data/hrl_load_metered_7.csv')
 
-    start_date = hrl['ds'].min().date()
-    end_date = hrl['ds'].max().date()
-    date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date + timedelta(1))
+    start_date = hrl['ds'].max().date() + timedelta(1)
+    end_date = hrl['ds'].max().date() + timedelta(1)
+    date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date)
     pred_all = forecasting(zones, hrl=hrl, model='neuralprophet')
     pred_all = pred_all.rename(columns={'y': 'mw'})
     pred_all['hour'] = pred_all['ds'].dt.hour
+    pred_all = pred_all[pred_all['ds'].dt.date == date_s]
+    #pred_all = pred_all.set_index('hour').reset_index()
+    pred_all.index = pred_all['hour'].values
 elif model=='XGBoost':
     date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
     try:
         pred_all = forecasting(zones, date=date_s, model='XGBoost')
     except:
         st.sidebar.exception('open-meteo.com connection timeout')
-        pred_all.read_csv('Data/pred_all_xgb.csv')
+        pred_all = pd.read_csv('Data/pred_all_xgb.csv', index_col=0)
 else:
     st.error('Not implemented!')
 
+
 container = st.sidebar.container()
-all = st.sidebar.checkbox("Select all", value=True)
-if all:
+if 'all_value' not in st.session_state.keys():
+    st.session_state.all_value = True
+
+All = st.sidebar.checkbox("Select all", value=st.session_state.all_value)
+if All:
     zone_s = container.multiselect("Select zones:", zmap.zone.unique(), default=zmap.zone.unique(), key='zone_k')
+    if 'zone_m' in st.session_state.keys():
+        st.session_state.zone_m = zone_s
+    if len(zone_s) == 21:
+        st.session_state.all_value = True
 else:
-    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=['AEP'], key='zone_k')
+    if 'zone_d' not in st.session_state.keys():
+        st.session_state.zone_d = []
+    elif len(st.session_state.zone_d) == len(zones):
+        st.session_state.zone_d = []
+    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=st.session_state.zone_d)
+    #st.write(st.session_state.zone_d)
 # zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
-# if len(zone_s) == 0:
-#     zone_s = ['AEP']
+if len(zone_s) == 0:
+    zone_s = zones.tolist()
 
+# if st.session_state.all_value and (len(st.session_state.zone_d) != 21):
+#     st.experimental_rerun()
 
+#st.write(st.session_state)
 hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")))
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
-def update_by_zone_date(zone_s, date_s, hrl=None):
+def update_by_zone_date(pred_all, zone_s, date_s, hrl=None):
     ## model prediction
     if model == 'neuralprophet':
         # pred_subset = forecasting(zone_s, hrl=hrl, model='neuralprophet')
         # pred_subset = pred_subset.rename(columns={'y': 'mw'})
         pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
-        hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw', 'temp']]], axis=0)
+        # hrl = pd.concat([hrl, pred_subset[['ds', 'zone', 'mw']]], axis=0)
         # data for map
-        hist_h = time_select(hrl, date_s, hour)
+        hist_h = time_select(pred_all, date_s, hour)
     elif model == 'XGBoost':
         pred_all['ds'] = pd.to_datetime(pred_all['date']) + pred_all['hour'].astype('timedelta64[h]')
         pred_subset = pred_all[pred_all['zone'].isin(zone_s)]
-        pred_subset['source'] = 'pred'
+        #pred_subset['source'] = 'pred'
         # data for map
         hist_h = time_select(pred_all, date_s, hour)[['zone', 'mw', 'temp', 'lat', 'long', 'full_zone_name', 'hist_peak_mw']]
     else:
@@ -153,7 +160,7 @@ def update_by_zone_date(zone_s, date_s, hrl=None):
     hist_h = hist_h.merge(pred_max_h, on='zone')
 
     # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
-    hist_h = z_selected(hist_h, zone_s)
+    # hist_h = z_selected(hist_h, zone_s)
     # hist_h = scale_color(hist_h)
     hist_h['mw'] = round(hist_h['mw'], 2)
     hist_h['pct'] = hist_h['mw_max'] / hist_h['hist_peak_mw']
@@ -163,17 +170,29 @@ def update_by_zone_date(zone_s, date_s, hrl=None):
 # st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 ## status
 if model == 'XGBoost':
-    pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=None)
-    if pred_subset.shape[0] > 0:
-        st.sidebar.success('Forecasting on all zones finished!', icon="✅")
+    pred_subset, hist_h = update_by_zone_date(pred_all, zone_s, date_s, hrl=None)
 elif model == 'neuralprophet':
-    pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=hrl)
-    if pred_subset.shape[0] > 0:
-        st.sidebar.success('Forecasting on ' + zone_s[-1] + ' finished!', icon="✅")
+    pred_subset, hist_h = update_by_zone_date(pred_all, zone_s, date_s, hrl=hrl)
+
+if pred_subset.shape[0] > 0:
+    st.sidebar.success('Forecasting on all zones finished!', icon="✅")
+
+
+@st.experimental_memo
+def convert_df(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+csv = convert_df(pred_all[['ds', 'zone', 'temp', 'mw']])
+st.sidebar.download_button(
+   "Download forecasts",
+   csv,
+   "forecast_{}.csv".format(date_s.strftime('%Y-%m-%d')),
+   "text/csv",
+   key='download-csv'
+)
 
 #########
 ## main
-
 def linear_scale(x):
     sc = (x - min(x)) / (max(x) - min(x))
     return sc * 40 + 10
@@ -188,28 +207,45 @@ def color_map(hist_h, i):
 
 agg_mw = pred_all.groupby('hour').agg({'mw': sum})
 agg_h = agg_mw['mw'].argmax()
+mw_sys = pred_all.loc[pred_all['hour'] == agg_h, ['zone', 'mw']]
+mw_sys = mw_sys.rename(columns={'mw': 'mw_sys'})
+hist_h = hist_h.merge(mw_sys, on='zone')
 
+mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+with mcol1:
+    st.metric('System Peak Load', str(round(max(agg_mw['mw']), 2))+' mw')
+with mcol2:
+    st.metric('System Peak Hour', str(agg_h) + 'H')
+if len(zone_s) < len(zones):
+    agg_s = pred_subset.groupby('hour').agg({'mw': sum})
+    agg_sh = agg_s['mw'].argmax()
+    agg_sm = agg_s['mw'].max()
+    with mcol3:
+        st.metric('Selected Peak Load', str(round(agg_sm))+' mw')
+    with mcol4:
+        st.metric('Selected Peak Hour', str(agg_sh) + 'H')
+# st.markdown('System Peak Load: **{}** mw<br>System Peak Hour: **{}H**'.format(
+#     str(round(max(agg_mw['mw']), 2)),
+#     #date_s.strftime('%Y-%m-%d'),
+#     str(agg_h)
+# ), unsafe_allow_html=True)
 top5 = hist_h.nlargest(5, 'mw_max')
-st.markdown('System Peak Load : **{}** mw (**{} {}H**)'.format(
-    str(round(max(agg_mw['mw']), 2)),
-    date_s.strftime('%Y-%m-%d'),
-    str(agg_h)
-))
-
 m = folium.Map([40, -80], zoom_start=6)
 locations = list(zip(hist_h['lat'], hist_h['long']))
 for i in range(len(zones)):
     if zones[i] in zone_s:
-        op = 0.8
+        b_color = 'black'
     else:
-        op = 0.4
+        b_color = color_map(hist_h, i)
     folium.CircleMarker(location=locations[i], radius=int(rad[i]), fill=True,
-                        color=color_map(hist_h, i), fill_opacity=op,
-                        tooltip="{}({})<br>Peak Load ({}H): {}<br>% of historical peak: {}%<br>Realtime Load ({}H): {}<br>Temperature ({}H): {}".format(
+                        color=b_color, fill_color=color_map(hist_h, i), fill_opacity=0.5,
+                        tooltip="<b>{}({})</b><br>Peak Load ({}H): {}<br>Load when system peak ({}H): {}<br>% of historical peak: {}%<br>Realtime Load ({}H): {}<br>Temperature ({}H): {}".format(
                             hist_h.loc[i, 'full_zone_name'],
                             hist_h.loc[i, 'zone'],
                             str(hist_h.loc[i, 'h_max']),
-                            str(hist_h.loc[i, 'mw_max']),
+                            str(round(hist_h.loc[i, 'mw_max'], 2)),
+                            str(agg_h),
+                            str(round(hist_h.loc[i, 'mw_sys'], 2)),
                             round(hist_h.loc[i, 'mw_max']/hist_h.loc[i, 'hist_peak_mw']*100, 2),
                             str(hour),
                             str(hist_h.loc[i, 'mw']),
@@ -227,82 +263,82 @@ for i in range(len(zones)):
                 )
             ).add_to(m)
 
-colormap = cm.LinearColormap(['green', 'yellow', 'red'], vmin=0, vmax=1, caption='% of Historical Peak')
-colormap.width = 300
+colormap = cm.LinearColormap(['green', 'yellow', 'red'], vmin=0, vmax=1, caption='Color: % of Historical Peak')
+colormap.width = 250
 colormap.add_to(m)
+
+cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size(px): MinMax scaled Load')
+cm2.width = 250
+m.add_child(cm2)
 
 click_out = st_folium(m, width=1300, height=500, returned_objects=['last_object_clicked'])
 
-if (not all) and (len(st.session_state.zone_m) == 21):
-    st.session_state.pop('zone_m', None)
-    zone_s = ['AEP']
 
-if 'zone_m' not in st.session_state.keys():
+# if not All:
+#     st.session_state.zone_m = zone_s.copy()
+if click_out['last_object_clicked'] is None:
     st.session_state.zone_m = zone_s.copy()
-
-if click_out['last_object_clicked'] is not None:
+else:
     zidx = (abs(zmap['lat'] - click_out['last_object_clicked']['lat']) + abs(zmap['long'] - click_out['last_object_clicked']['lng'])).argmin()
     zone_co = zmap.loc[zidx, 'zone']
 
     if not zone_co in st.session_state.zone_m:
         st.session_state.zone_m.append(zone_co)
         zone_s = st.session_state.zone_m.copy()
+        #st.session_state.zone_d.append(zone_co)
     else:
         st.session_state.zone_m.remove(zone_co)
         zone_s = st.session_state.zone_m.copy()
-
+    st.session_state.zone_d = zone_s
+    if len(zone_s) != len(zones):
+        st.session_state.all_value = False
+    elif len(st.session_state.zone_d) != len(zones):
+        st.session_state.all_value = False
+    else:
+        st.session_state.all_value = True
+    st.experimental_rerun()
     pred_subset, hist_h = update_by_zone_date(zone_s, date_s, hrl=None)
+
+# if len(zone_s) != len(zones):
+#     st.session_state.all_value = False
+# else:
+#     st.session_state.all_value = True
+pred_all['selected'] = pred_all['zone'].isin(zone_s).astype('str')
 
 col1, col2, col3 = st.columns([3, 3, 1])
 with col1:
-    st.write('Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
+    st.write('System Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
     try:
-        if model == 'neuralprophet':
-            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
-                           symbol_map={"PJM": "circle", "pred": "x"},
-                           markers=True, template="plotly_white", log_y=True,
-                           height=200)
-        else:
-            # fig1 = px.line(pred_subset, x='ds', y='mw', color='zone',
-            #                symbol_map={"PJM": "circle", "pred": "x"},
-            #                markers=True, template="plotly_white", log_y=True,
-            #                height=200)
-            fig1 = px.area(pred_subset, x='ds', y='mw', color='zone',
-                           template="plotly_white",
-                           height=200)
+        fig1 = px.area(pred_all, x='ds', y='mw', color='zone',
+                       template="plotly_white", symbol='selected',
+                       symbol_map={'True': 'circle', 'False': 'line-ew'},
+                       height=200)
     except Exception:
-        if model == 'neuralprophet':
-            fig1 = px.line(pred_subset, x='ds', y='mw', color='zone', symbol='source',
-                           symbol_map={"PJM": "circle", "pred": "x"},
-                           markers=True, template="plotly_white", log_y=True,
-                           height=200)
-        else:
-            # fig1 = px.line(pred_subset, x='ds', y='mw', color='zone',
-            #                symbol_map={"PJM": "circle", "pred": "x"},
-            #                markers=True, template="plotly_white", log_y=True,
-            #                height=200)
-            fig1 = px.area(pred_subset, x='ds', y='mw', color='zone',
-                           template="plotly_white",
-                           height=200)
+        fig1 = px.area(pred_all, x='ds', y='mw', color='zone',
+                       template="plotly_white", symbol='selected',
+                       symbol_map={'True': 'circle', 'False': 'line-ew'},
+                       height=200)
     fig1.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0},
                        xaxis_title=None, yaxis_title="Hourly Load (mw)",
                        legend=dict(orientation="h"))
     fig1.update_yaxes(gridcolor='lightgrey')
-    if model == 'neuralprophet':
-        pred_date = end_date + timedelta(1)
-        fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash",
-                       line_width=1, line_color='red')
+    # if model == 'neuralprophet':
+    #     pred_date = end_date + timedelta(1)
+    #     fig1.add_vline(x=datetime.datetime(pred_date.year, pred_date.month, pred_date.day, 0, 0), line_dash="dash",
+    #                    line_width=1, line_color='red')
     fig1.add_vline(x=time_s, line_dash="dash")
 
     st.plotly_chart(fig1, use_container_width=True)
 
 with col2:
-    st.write('System Load / Average Temperature')
-    agg_temp = pred_all.groupby('hour').agg({'temp': 'mean'}).reset_index()
+    st.write('Selected zone(s) Load / Average Temperature')
+    agg_subset = pred_subset.groupby('hour').agg({'mw': 'sum'}).reset_index()
+    agg_temp = pred_subset.groupby('hour').agg({'temp': 'mean'}).reset_index()
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
 
     fig2.add_trace(
-        go.Scatter(x=agg_mw.index, y=agg_mw['mw'], name="System Load (mw)"),
+        go.Scatter(x=agg_subset['hour'], y=agg_subset['mw'], name="Selected zones Load (mw)",
+                   marker=dict(symbol=['circle']*24)),
         secondary_y=False,
     )
     fig2.add_trace(
@@ -338,10 +374,13 @@ with col3:
         delta_mw = ''
     st.metric('System Load ('+str(hour)+'H)', str(round(mw1, 1)), delta_mw)
 
-    mw1 = pred_subset[(pred_subset['ds']==time_s) & (pred_subset['zone']==zone_s[-1])]['mw']
+    agg_mw_s = pred_subset.groupby('hour').agg({'mw': sum})
+    mw1 = agg_mw_s.loc[agg_mw_s.index == hour, 'mw'].values[0]
     if hour >= 1:
-        mw0 = pred_subset[(pred_subset['ds']==(time_s-timedelta(hours=1))) & (pred_subset['zone']==zone_s[-1])]['mw']
-        delta_mw = str(round(mw1.values[0]-mw0.values[0], 1))
+        mw0 = agg_mw_s.loc[agg_mw_s.index == (hour - 1), 'mw'].values[0]
+        delta_mw = str(round(mw1-mw0, 1))
     else:
         delta_mw = ''
-    st.metric('Last selected ('+zone_s[-1]+' '+ str(hour)+'H)', str(round(mw1.values[0], 1)), delta_mw)
+    st.metric('Selected Load ('+ str(hour)+'H)', str(round(mw1, 1)), delta_mw)
+
+#st.write(st.session_state)
