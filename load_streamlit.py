@@ -13,10 +13,52 @@ import branca.colormap as cm
 from folium.features import DivIcon
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from branca.element import Template, MacroElement
 
+template = """
+{% macro html(this, kwargs) %}
+<html lang="en">
+<body>
+<div id='maplegend' class='maplegend'
+    style='position: absolute; z-index:9999; border:1px solid grey; background-color:rgba(255, 255, 255, 0.8);
+     border-radius:6px; padding: 10px; font-size:12px; right: 20px; bottom: 40px;'>
 
-st.set_page_config(layout="wide")
-st.markdown('<style>.main .block-container {padding-top: 2rem; padding-bottom: 0rem}</style>', unsafe_allow_html=True)
+<div class='legend-title'>Scaled Load (mw)</div>
+<div class='legend-scale'>
+    <p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp <span class="dot10"></span>&nbsp35</p>
+    <p>&nbsp&nbsp&nbsp&nbsp <span class="dot25"></span>&nbsp7,500</p>
+    <p><span class="dot50"></span>15,000</p>
+</body>
+</html>
+<style>
+    .dot10 {
+        height: 20px;
+        width: 20px;
+    }
+    .dot25 {
+        height: 40px;
+        width: 40px;
+    }
+    .dot50 {
+        height: 80px;
+        width: 80px;
+    }
+    span {
+        background-color: #bbb;
+        border-radius: 50%;
+        display: inline-block;
+        vertical-align: middle;}
+</style>
+{% endmacro %}
+"""
+
+st.set_page_config(page_title="PJM Day-Ahead Forecasting Tool", layout="wide")
+st.markdown(f'''
+<style>
+.css-af4qln.e16nr0p31 {{margin-top: -75px}}
+.main .block-container {{padding-top: 2rem; padding-bottom: 0rem}}
+</style>
+''', unsafe_allow_html=True)
 
 ## load data
 @st.cache
@@ -71,6 +113,7 @@ zmap, zones = load_data()
 
 ###########
 ## side bar
+st.sidebar.header('PJM Day-Ahead Forecasting Tool')
 model = st.sidebar.selectbox('Choose model:',
                              ('XGBoost', 'neuralprophet'),
                              index=0)
@@ -107,7 +150,7 @@ else:
 
 container = st.sidebar.container()
 if 'all_value' not in st.session_state.keys():
-    st.session_state.all_value = True
+    st.session_state.all_value = False
 
 All = st.sidebar.checkbox("Select all", value=st.session_state.all_value)
 if All:
@@ -124,8 +167,8 @@ else:
     zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=st.session_state.zone_d)
     #st.write(st.session_state.zone_d)
 # zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
-if len(zone_s) == 0:
-    zone_s = zones.tolist()
+# if len(zone_s) == 0:
+#     zone_s = zones.tolist()
 
 # if st.session_state.all_value and (len(st.session_state.zone_d) != 21):
 #     st.experimental_rerun()
@@ -213,15 +256,15 @@ hist_h = hist_h.merge(mw_sys, on='zone')
 
 mcol1, mcol2, mcol3, mcol4 = st.columns(4)
 with mcol1:
-    st.metric('System Peak Load', str(round(max(agg_mw['mw']), 2))+' mw')
+    st.metric('System Peak Load', f'{round(max(agg_mw["mw"])):,}'+' mw')
 with mcol2:
     st.metric('System Peak Hour', str(agg_h) + 'H')
-if len(zone_s) < len(zones):
+if (len(zone_s) < len(zones)) and (len(zone_s) > 0):
     agg_s = pred_subset.groupby('hour').agg({'mw': sum})
     agg_sh = agg_s['mw'].argmax()
     agg_sm = agg_s['mw'].max()
     with mcol3:
-        st.metric('Selected Peak Load', str(round(agg_sm))+' mw')
+        st.metric('Selected Peak Load', f'{(round(agg_sm)):,}'+' mw')
     with mcol4:
         st.metric('Selected Peak Hour', str(agg_sh) + 'H')
 # st.markdown('System Peak Load: **{}** mw<br>System Peak Hour: **{}H**'.format(
@@ -243,12 +286,12 @@ for i in range(len(zones)):
                             hist_h.loc[i, 'full_zone_name'],
                             hist_h.loc[i, 'zone'],
                             str(hist_h.loc[i, 'h_max']),
-                            str(round(hist_h.loc[i, 'mw_max'], 2)),
+                            f'{round(hist_h.loc[i, "mw_max"]):,}',
                             str(agg_h),
-                            str(round(hist_h.loc[i, 'mw_sys'], 2)),
+                            f'{round(hist_h.loc[i, "mw_sys"]):,}',
                             round(hist_h.loc[i, 'mw_max']/hist_h.loc[i, 'hist_peak_mw']*100, 2),
                             str(hour),
-                            str(hist_h.loc[i, 'mw']),
+                            f'{round(hist_h.loc[i, "mw"]):,}',
                             str(hour),
                             str(hist_h.loc[i, 'temp'])
     )).add_to(m)
@@ -259,7 +302,7 @@ for i in range(len(zones)):
             icon=DivIcon(
                 #icon_size=(250,36),
                 icon_anchor=(5,0),
-                html='<div style="font-size: 10pt">{} {}</div>'.format(zones[i], str(round(hist_h.loc[i, 'mw_max'],2))),
+                html='<div style="font-size: 10pt">{} {}</div>'.format(zones[i], f'{round(hist_h.loc[i, "mw_max"]):,}'),
                 )
             ).add_to(m)
 
@@ -267,9 +310,13 @@ colormap = cm.LinearColormap(['green', 'yellow', 'red'], vmin=0, vmax=1, caption
 colormap.width = 250
 colormap.add_to(m)
 
-cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size(px): MinMax scaled Load')
-cm2.width = 250
-m.add_child(cm2)
+# cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size(px): MinMax scaled Load')
+# cm2.width = 250
+# m.add_child(cm2)
+
+macro = MacroElement()
+macro._template = Template(template)
+m.get_root().add_child(macro)
 
 click_out = st_folium(m, width=1300, height=500, returned_objects=['last_object_clicked'])
 
@@ -369,18 +416,19 @@ with col3:
     mw1 = agg_mw.loc[agg_mw.index==hour, 'mw'].values[0]
     if hour >= 1:
         mw0 = agg_mw.loc[agg_mw.index == (hour-1), 'mw'].values[0]
-        delta_mw = str(round(mw1-mw0, 1))
+        delta_mw = str(round(mw1-mw0))
     else:
         delta_mw = ''
-    st.metric('System Load ('+str(hour)+'H)', str(round(mw1, 1)), delta_mw)
+    st.metric('System Load ('+str(hour)+'H)', f'{(round(mw1)):,}', delta_mw)
 
-    agg_mw_s = pred_subset.groupby('hour').agg({'mw': sum})
-    mw1 = agg_mw_s.loc[agg_mw_s.index == hour, 'mw'].values[0]
-    if hour >= 1:
-        mw0 = agg_mw_s.loc[agg_mw_s.index == (hour - 1), 'mw'].values[0]
-        delta_mw = str(round(mw1-mw0, 1))
-    else:
-        delta_mw = ''
-    st.metric('Selected Load ('+ str(hour)+'H)', str(round(mw1, 1)), delta_mw)
+    if len(zone_s) > 0:
+        agg_mw_s = pred_subset.groupby('hour').agg({'mw': sum})
+        mw1 = agg_mw_s.loc[agg_mw_s.index == hour, 'mw'].values[0]
+        if hour >= 1:
+            mw0 = agg_mw_s.loc[agg_mw_s.index == (hour - 1), 'mw'].values[0]
+            delta_mw = str(round(mw1-mw0))
+        else:
+            delta_mw = ''
+        st.metric('Selected Load ('+ str(hour)+'H)', f'{(round(mw1)):,}', delta_mw)
 
 #st.write(st.session_state)

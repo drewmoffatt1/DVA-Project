@@ -172,8 +172,8 @@ class ModelXGB:
         result_df = df8[['date', 'hour']].copy()
         result_df['zone'] = self.zone
         x = df8[['year', 'weekend', 'holiday', 'is_dst', 'is_sah', 'precovid',
-           'postcovid', 'temp', 'precip', 'rh', 'pressure', 'windspeed', 'rain', 'snow',
-           'recent', 'hour_cos', 'hour_sin', 'month_cos', 'month_sin', 'dow_num']].copy()
+                 'postcovid', 'temp', 'precip', 'rh', 'pressure', 'windspeed', 'rain', 'snow',
+                 'recent', 'hour_cos', 'hour_sin', 'month_cos', 'month_sin', 'dow_num', 'season_num']].copy()
         x['rain'] = x['rain'].astype('bool')
         x['snow'] = x['snow'].astype('bool')
         return result_df, x
@@ -185,7 +185,7 @@ class ModelXGB:
 
         result_df, x = self.create_analysis_df(df1, strdate)
         model2 = xgb.XGBRegressor()
-        model2.load_model("model_checkpoints/xgb_mod_" + self.zone + ".txt")
+        model2.load_model("models/xgb_mod_" + self.zone + ".txt")
         result_df['mw'] = model2.predict(x)
         result_df = pd.concat([result_df, x], axis=1)
         return result_df
