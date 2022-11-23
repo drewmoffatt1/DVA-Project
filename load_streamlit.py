@@ -116,7 +116,9 @@ zmap, zones = load_data()
 st.sidebar.header('PJM Day-Ahead Forecasting Tool')
 model = st.sidebar.selectbox('Choose model:',
                              ('XGBoost', 'neuralprophet'),
-                             index=0)
+                             index=0,
+                             help='XGBoost model is based on weather forecast. '
+                                  'NeuralProphet model based on both weather forcast and 7-days historical records')
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
@@ -130,7 +132,8 @@ if model=='neuralprophet':
 
     start_date = hrl['ds'].max().date() + timedelta(1)
     end_date = hrl['ds'].max().date() + timedelta(1)
-    date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date)
+    date_s = st.sidebar.date_input('Select Date:', value=end_date, min_value=start_date, max_value=end_date,
+                                   help='Model will forcast the 24h Load after the given 7-days.')
     pred_all = forecasting(zones, hrl=hrl, model='neuralprophet')
     pred_all = pred_all.rename(columns={'y': 'mw'})
     pred_all['hour'] = pred_all['ds'].dt.hour
@@ -138,12 +141,14 @@ if model=='neuralprophet':
     #pred_all = pred_all.set_index('hour').reset_index()
     pred_all.index = pred_all['hour'].values
 elif model=='XGBoost':
-    date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today())
+    date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today(),
+                                   help='Recent day if the weather forecast is available.')
     try:
         pred_all = forecasting(zones, date=date_s, model='XGBoost')
     except:
         st.sidebar.exception('open-meteo.com connection timeout')
         pred_all = pd.read_csv('Data/pred_all_xgb.csv', index_col=0)
+        date_s = pred_all['date'].values[0]
 else:
     st.error('Not implemented!')
 
@@ -154,7 +159,10 @@ if 'all_value' not in st.session_state.keys():
 
 All = st.sidebar.checkbox("Select all", value=st.session_state.all_value)
 if All:
-    zone_s = container.multiselect("Select zones:", zmap.zone.unique(), default=zmap.zone.unique(), key='zone_k')
+    zone_s = container.multiselect("Select zones:", zmap.zone.unique(), default=zmap.zone.unique(), key='zone_k',
+                                   help='Multiple selection for transmission zones to investigate. '
+                                        'Selected zones will be highlighted on map and plots.'
+                                        'Zones can also be selected by clicking the markers on the map.')
     if 'zone_m' in st.session_state.keys():
         st.session_state.zone_m = zone_s
     if len(zone_s) == 21:
@@ -164,7 +172,10 @@ else:
         st.session_state.zone_d = []
     elif len(st.session_state.zone_d) == len(zones):
         st.session_state.zone_d = []
-    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=st.session_state.zone_d)
+    zone_s = container.multiselect("Select one or more options:", zmap.zone.unique(), default=st.session_state.zone_d,
+                                   help='Multiple selection for transmission zones to investigate. '
+                                        'Selected zones will be highlighted on map and plots. '
+                                        'Zones can also be selected by clicking the markers on the map.')
     #st.write(st.session_state.zone_d)
 # zone_s = st.sidebar.multiselect('Zones:', zmap.zone.unique(), default=['AEP', 'CE'], key='zone_k')
 # if len(zone_s) == 0:
@@ -174,7 +185,8 @@ else:
 #     st.experimental_rerun()
 
 #st.write(st.session_state)
-hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")))
+hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")),
+                         help='The realtime load will shown on the map and the trend on the cards.')
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
 def update_by_zone_date(pred_all, zone_s, date_s, hrl=None):
@@ -227,11 +239,12 @@ def convert_df(df):
 
 csv = convert_df(pred_all[['ds', 'zone', 'temp', 'mw']])
 st.sidebar.download_button(
-   "Download forecasts",
-   csv,
-   "forecast_{}.csv".format(date_s.strftime('%Y-%m-%d')),
-   "text/csv",
-   key='download-csv'
+    "Download forecasts",
+    csv,
+    "forecast_{}.csv".format(date_s.strftime('%Y-%m-%d')),
+    "text/csv",
+    key='download-csv',
+    help='To download forcasts in csv format for all zones.'
 )
 
 #########
@@ -310,13 +323,13 @@ colormap = cm.LinearColormap(['green', 'yellow', 'red'], vmin=0, vmax=1, caption
 colormap.width = 250
 colormap.add_to(m)
 
-# cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size(px): MinMax scaled Load')
-# cm2.width = 250
-# m.add_child(cm2)
+cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size: MinMax scaled Load')
+cm2.width = 200
+m.add_child(cm2)
 
-macro = MacroElement()
-macro._template = Template(template)
-m.get_root().add_child(macro)
+# macro = MacroElement()
+# macro._template = Template(template)
+# m.get_root().add_child(macro)
 
 click_out = st_folium(m, width=1300, height=500, returned_objects=['last_object_clicked'])
 
@@ -378,13 +391,20 @@ with col1:
     st.plotly_chart(fig1, use_container_width=True)
 
 with col2:
-    st.write('Selected zone(s) Load / Average Temperature')
-    agg_subset = pred_subset.groupby('hour').agg({'mw': 'sum'}).reset_index()
-    agg_temp = pred_subset.groupby('hour').agg({'temp': 'mean'}).reset_index()
+    if len(zone_s) > 0:
+        SA = 'Selected'
+        agg_subset = pred_subset.groupby('hour').agg({'mw': 'sum'}).reset_index()
+        agg_temp = pred_subset.groupby('hour').agg({'temp': 'mean'}).reset_index()
+    else:
+        SA = 'All'
+        agg_subset = pred_all.groupby('hour').agg({'mw': 'sum'}).reset_index()
+        agg_temp = pred_all.groupby('hour').agg({'temp': 'mean'}).reset_index()
+
+    st.write('{} zone(s) Load / Average Temperature'.format(SA))
     fig2 = make_subplots(specs=[[{"secondary_y": True}]])
 
     fig2.add_trace(
-        go.Scatter(x=agg_subset['hour'], y=agg_subset['mw'], name="Selected zones Load (mw)",
+        go.Scatter(x=agg_subset['hour'], y=agg_subset['mw'], name="{} zones Load (mw)".format(SA),
                    marker=dict(symbol=['circle']*24)),
         secondary_y=False,
     )
@@ -399,18 +419,6 @@ with col2:
         legend=dict(orientation="h")
     )
     st.plotly_chart(fig2, use_container_width=True)
-    # st.write('Weather Forecast')
-    # pred_subset['pressure'] = round(pred_subset['pressure'], 4)
-    # fig2 = px.line(pred_subset, x='ds', y='temp', color='zone',
-    #                markers=True, template="plotly_white", log_y=True,
-    #                hover_data=['rh', 'precip', 'pressure', 'windspeed', 'rain', 'snow'],
-    #                height=200)
-    # fig2.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0},
-    #                    xaxis_title=None, yaxis_title="temperature",
-    #                    legend=dict(orientation="h"))
-    # fig2.update_yaxes(gridcolor='lightgrey')
-    # fig2.add_vline(x=time_s, line_dash="dash")
-    # st.plotly_chart(fig2, use_container_width=True)
 
 with col3:
     mw1 = agg_mw.loc[agg_mw.index==hour, 'mw'].values[0]

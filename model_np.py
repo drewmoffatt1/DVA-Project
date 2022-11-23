@@ -61,7 +61,7 @@ class ModelNP:
 
 
     def predict(self, hrl):
-        m = load('model_checkpoints/np_f24_'+self.zone+'.pth')
+        m = load('models/np_f24_'+self.zone+'.pth')
         #dat = pjm_load(hrl, zone)
         ## prediction
         dat = self.pjm_load(hrl)
