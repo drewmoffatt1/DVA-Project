@@ -19,35 +19,52 @@ template = """
 {% macro html(this, kwargs) %}
 <html lang="en">
 <body>
-<div id='maplegend' class='maplegend'
-    style='position: absolute; z-index:9999; border:1px solid grey; background-color:rgba(255, 255, 255, 0.8);
-     border-radius:6px; padding: 10px; font-size:12px; right: 20px; bottom: 40px;'>
-
-<div class='legend-title'>Scaled Load (mw)</div>
+<div class='my-legend'>
+<div class='legend-title'>MinMax Scaled Load</div>
 <div class='legend-scale'>
-    <p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp <span class="dot10"></span>&nbsp35</p>
-    <p>&nbsp&nbsp&nbsp&nbsp <span class="dot25"></span>&nbsp7,500</p>
-    <p><span class="dot50"></span>15,000</p>
+  <ul class='legend-labels'>
+    <li><span style='background:#008000;'></span></li>
+    <li><span style='background:#FF7F50;'></span>50mw</li>
+    <li><span style='background:#FF7F50;'></span></li>
+    <li><span style='background:#FF7F50;'></span>15,000mw</li>
+  </ul>
+</div>
+</div>
 </body>
 </html>
 <style>
-    .dot10 {
-        height: 20px;
-        width: 20px;
+    .my-legend {
+        position: relative;
+        z-index:9999;
+        right: -1155px;
+        bottom: 450px;
     }
-    .dot25 {
-        height: 40px;
-        width: 40px;
+  .my-legend .legend-title {
+    text-align: left;
+    margin-bottom: 8px;
+    font-size: 90%;
     }
-    .dot50 {
-        height: 80px;
-        width: 80px;
+  .my-legend .legend-scale ul {
+    margin: 0;
+    padding: 0;
+    float: left;
+    list-style: none;
     }
-    span {
-        background-color: #bbb;
-        border-radius: 50%;
-        display: inline-block;
-        vertical-align: middle;}
+  .my-legend .legend-scale ul li {
+    display: block;
+    float: left;
+    width: 20px;
+    margin-bottom: 6px;
+    text-align: left;
+    font-size: 80%;
+    list-style: none;
+    }
+  .my-legend ul.legend-labels li span {
+    display: block;
+    float: left;
+    height: 12px;
+    width: 50px;
+    }
 </style>
 {% endmacro %}
 """
@@ -323,13 +340,13 @@ colormap = cm.LinearColormap(['green', 'yellow', 'red'], vmin=0, vmax=1, caption
 colormap.width = 250
 colormap.add_to(m)
 
-cm2 = cm.StepColormap(['black'], vmin=10, vmax=50, caption='Size: MinMax scaled Load')
-cm2.width = 200
-m.add_child(cm2)
+# cm2 = cm.StepColormap(['black'], vmin=20, vmax=100, caption='50----------------------15000mw')
+# cm2.width = 200
+# m.add_child(cm2)
 
-# macro = MacroElement()
-# macro._template = Template(template)
-# m.get_root().add_child(macro)
+macro = MacroElement()
+macro._template = Template(template)
+m.get_root().add_child(macro)
 
 click_out = st_folium(m, width=1300, height=500, returned_objects=['last_object_clicked'])
 
@@ -365,7 +382,7 @@ else:
 #     st.session_state.all_value = True
 pred_all['selected'] = pred_all['zone'].isin(zone_s).astype('str')
 
-col1, col2, col3 = st.columns([3, 3, 1])
+col1, col2, col3 = st.columns([4, 3, 1])
 with col1:
     st.write('System Load Forecast (' + time_s.strftime('%Y-%m-%d')+')')
     try:
@@ -379,8 +396,8 @@ with col1:
                        symbol_map={'True': 'circle', 'False': 'line-ew'},
                        height=200)
     fig1.update_layout(margin={"t": 0, "b": 0, "l": 0, "r": 0},
-                       xaxis_title=None, yaxis_title="Hourly Load (mw)",
-                       legend=dict(orientation="h"))
+                       xaxis_title=None, yaxis_title="Hourly Load (mw)")
+                       #legend=dict(orientation="h"))
     fig1.update_yaxes(gridcolor='lightgrey')
     # if model == 'neuralprophet':
     #     pred_date = end_date + timedelta(1)
