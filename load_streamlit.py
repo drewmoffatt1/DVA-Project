@@ -20,7 +20,7 @@ template = """
 <html lang="en">
 <body>
 <div class='my-legend'>
-<div class='legend-title'>MinMax Scaled Load</div>
+<div class='legend-title'>Node size by peak load</div>
 <div class='legend-scale'>
   <ul class='legend-labels'>
     <li><span style='background:#008000;'></span></li>
@@ -42,7 +42,7 @@ template = """
   .my-legend .legend-title {
     text-align: left;
     margin-bottom: 8px;
-    font-size: 90%;
+    font-size: 75%;
     }
   .my-legend .legend-scale ul {
     margin: 0;
@@ -270,7 +270,7 @@ def linear_scale(x):
     sc = (x - min(x)) / (max(x) - min(x))
     return sc * 40 + 10
 
-rad = linear_scale(hist_h['mw']).values
+rad = linear_scale(hist_h['mw_max']).values
 
 def color_map(hist_h, i):
     step = cm.LinearColormap(['green', 'yellow', 'red'],
@@ -294,9 +294,9 @@ if (len(zone_s) < len(zones)) and (len(zone_s) > 0):
     agg_sh = agg_s['mw'].argmax()
     agg_sm = agg_s['mw'].max()
     with mcol3:
-        st.metric('Selected Peak Load', f'{(round(agg_sm)):,}'+' mw')
+        st.metric('Peak Load for Selected Zones', f'{(round(agg_sm)):,}'+' mw')
     with mcol4:
-        st.metric('Selected Peak Hour', str(agg_sh) + 'H')
+        st.metric('Peak Hour for Selected Zones', str(agg_sh) + 'H')
 # st.markdown('System Peak Load: **{}** mw<br>System Peak Hour: **{}H**'.format(
 #     str(round(max(agg_mw['mw']), 2)),
 #     #date_s.strftime('%Y-%m-%d'),
