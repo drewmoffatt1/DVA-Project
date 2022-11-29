@@ -20,16 +20,18 @@ template = """
 <html lang="en">
 <body>
 <div class='my-legend'>
-<div class='legend-title'>Node size by peak load</div>
 <div class='legend-scale'>
   <ul class='legend-labels'>
-    <li><span style='background:#008000;'></span></li>
-    <li><span style='background:#FF7F50;'></span>50mw</li>
-    <li><span style='background:#FF7F50;'></span></li>
-    <li><span style='background:#FF7F50;'></span>15,000mw</li>
+    <li>&nbsp<span style='background:#008000;'></span></li>
+    <li>50<span style='background:#FF7F50;'></span></li>
+    <li>&nbsp<span style='background:#FF7F50;'></span></li>
+    <li>&nbsp&nbsp&nbsp&nbsp15,000<span style='background:#FF7F50;'></span></li>
   </ul>
 </div>
+<br>
+<div class='legend-title'>Node size by peak load</div>
 </div>
+
 </body>
 </html>
 <style>
@@ -41,7 +43,7 @@ template = """
     }
   .my-legend .legend-title {
     text-align: left;
-    margin-bottom: 8px;
+    margin-top: 8px;
     font-size: 75%;
     }
   .my-legend .legend-scale ul {
@@ -49,6 +51,7 @@ template = """
     padding: 0;
     float: left;
     list-style: none;
+    height: 20px;
     }
   .my-legend .legend-scale ul li {
     display: block;
