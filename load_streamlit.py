@@ -247,7 +247,7 @@ if model == 'XGBoost':
 elif model == 'neuralprophet':
     pred_subset, hist_h = update_by_zone_date(pred_all, zone_s, date_s, hrl=hrl)
 
-if pred_subset.shape[0] > 0:
+if pred_all.shape[0] > 0:
     st.sidebar.success('Forecasting on all zones finished!', icon="✅")
 
 
