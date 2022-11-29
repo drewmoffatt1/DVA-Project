@@ -131,12 +131,11 @@ zmap, zones = load_data()
 ###########
 ## side bar
 st.sidebar.header('PJM Day-Ahead Forecasting Tool')
-# model = st.sidebar.selectbox('Choose model:',
-#                              ('XGBoost', 'neuralprophet'),
-#                              index=0,
-#                              help='XGBoost model is based on weather forecast. '
-#                                   'NeuralProphet model based on both weather forcast and 7-days historical records')
-model = 'XGBoost'
+model = st.sidebar.selectbox('Choose model:',
+                             ('XGBoost', 'neuralprophet'),
+                             index=0,
+                             help='XGBoost model is based on weather forecast. '
+                                  'NeuralProphet model based on both weather forcast and 7-days historical records')
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
