@@ -9,6 +9,7 @@
 
 ## Web Application
 **Live Application:** [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
+
 ![plot](images/Dash-Overview.png)
 
 <a name="overview"></a>
