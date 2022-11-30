@@ -1,6 +1,6 @@
 # PJM Day-Ahead Forecasting Tool
 
-# Table of Contents
+## Table of Contents
 1. [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
 2. [Application Overview](#overview)
 3. [Application Architecture](#architecture)
