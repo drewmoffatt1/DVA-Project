@@ -16,7 +16,7 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 
 <a name="architecture"></a>
 ## Application Architecture
-![plot](application-architecture.png)
+![plot](App-Architecture.png)
 
 <a name="usage"></a>
 ## How to Use Application
