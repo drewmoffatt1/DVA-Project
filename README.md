@@ -9,6 +9,7 @@
 
 ## Web Application
 **Live Application:** [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
+![plot](images/Dash-Overview.png)
 
 <a name="overview"></a>
 ## Application Overview
@@ -16,13 +17,18 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 
 <a name="architecture"></a>
 ## Application Architecture
-![plot](App-Architecture.png)
+![plot](images/App-Architecture.png)
 
 <a name="usage"></a>
 ## How to Use Application
 1. Open application - [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
-2. Select a time parameter to see predictions for that time
-3. Hover over each zone to view peak load and other factors that may contribute to this load
+2. Select a date parameter to see predictions for that time - **will default to current date**
+3. Select one or more zones to see specific areas - **will default to all zones**
+    - Note: you can also click the circle on the map to select a specific zone
+4. Select a specific hour to see system load - **will update real time load on graph**
+5. Hover over each zone to view peak load and other factors that may contribute to this load
+
+
 
 <a name="local"></a>
 ## Running App Locally (optional)
@@ -36,8 +42,3 @@ streamlit run load_streamlit.py
 ```
 Now you can view the App locally: <http://localhost:8501/>
 
-## Update models
-* To train the NeuralProphet model
-```
-python model_neuralprophet.py
-```
