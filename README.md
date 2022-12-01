@@ -5,12 +5,14 @@
 2. [Application Overview](#overview)
 3. [Application Architecture](#architecture)
 4. [How to Use Application](#usage)
-5. [Running Locally](#local)
+5. [GitHub Structure](#structure)
+6. [Running Locally](#local)
+
 
 ## Web Application
 **Live Application:** [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
 
-![plot](images/Dash-Overview.png)
+![plot](images/Dashboard-Overview.png)
 
 <a name="overview"></a>
 ## Application Overview
@@ -28,6 +30,10 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
     - Note: you can also click the circle on the map to select a specific zone
 4. Select a specific hour to see system load - **will update real time load on graph**
 5. Hover over each zone to view peak load and other factors that may contribute to this load
+
+
+<a name="structure"></a>
+## GitHub Folders/Files
 
 
 
