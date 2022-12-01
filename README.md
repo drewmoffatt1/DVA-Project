@@ -35,20 +35,20 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 <a name="structure"></a>
 ## GitHub Folders/Files
 ```bash
-├── PJM Load Forecast Visualizer.twb
-├── forecastPJMLoad.py
-├── load_streamlit.py
-├── model_neuralprophet.py ## Legacy
-├── model_np.py ## Legacy
-├── model_prophet.py ## Legacy
-├── model_xgb.py
-├── Data ## data used in model
-├── Legacy ## EDA and Model Discovery
-├── images ## images for README
-├── models ## model files for each zone
-├── output ## output of model used for visualization
+├── PJM Load Forecast Visualizer.twb            ## code to build streamlit application
+├── forecastPJMLoad.py                          ## code to generate new forecast with model
+├── load_streamlit.py                           ## code to load streamlit application
+├── model_neuralprophet.py                      ## Legacy
+├── model_np.py                                 ## Legacy
+├── model_prophet.py                            ## Legacy
+├── model_xgb.py                                ## xg boost model code
+├── Data                                        ## data used in model
+├── Legacy                                      ## EDA and Model Discovery
+├── images                                      ## images for README
+├── models                                      ## model files for each zone
+├── output                                      ## output of model used for visualization
 ├── README.md
-├── requirements.txt ## packages required to run application locally
+├── requirements.txt                            ## packages required to run application locally
 └── .gitignore
 ```
 
