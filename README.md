@@ -5,7 +5,7 @@
 2. [Application Overview](#overview)
 3. [Application Architecture](#architecture)
 4. [How to Use Application](#usage)
-5. [GitHub Structure](#structure)
+5. [Github Folder Structure](#structure)
 6. [Running Locally](#local)
 
 
@@ -34,8 +34,23 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 
 <a name="structure"></a>
 ## GitHub Folders/Files
-
-
+```bash
+├── PJM Load Forecast Visualizer.twb
+├── forecastPJMLoad.py
+├── load_streamlit.py
+├── model_neauralprophet.py ## Delete
+├── model_np.py ## Delete
+├── model_prophet.py ## Delete
+├── model_xgb.py
+├── update_forecast.ipynb ## Delete
+├── Data
+├── images
+├── models
+├── output
+├── README.md
+├── requirements.txt
+└── .gitignore
+```
 
 <a name="local"></a>
 ## Running App Locally (optional)
