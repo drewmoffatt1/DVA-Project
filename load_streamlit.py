@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.colors
-from model_np import ModelNP
+#from model_np import ModelNP
 from model_xgb import ModelXGB
 from datetime import timedelta
 import datetime
