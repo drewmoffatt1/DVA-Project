@@ -38,11 +38,11 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 ├── PJM Load Forecast Visualizer.twb
 ├── forecastPJMLoad.py
 ├── load_streamlit.py
-├── model_neauralprophet.py ## Delete
-├── model_np.py ## Delete
-├── model_prophet.py ## Delete
+├── model_neuralprophet.py ## Legacy
+├── model_np.py ## Legacy
+├── model_prophet.py ## Legacy
 ├── model_xgb.py
-├── update_forecast.ipynb ## Delete
+├── update_forecast.ipynb ## Legacy
 ├── Data
 ├── images
 ├── models
