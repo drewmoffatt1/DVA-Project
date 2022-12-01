@@ -42,12 +42,13 @@ PJM is a regional transmission organization (RTO) that manages transmission of e
 ├── model_np.py ## Legacy
 ├── model_prophet.py ## Legacy
 ├── model_xgb.py
-├── Data
-├── images
-├── models
-├── output
+├── Data ## data used in model
+├── Legacy ## EDA and Model Discovery
+├── images ## images for README
+├── models ## model files for each zone
+├── output ## output of model used for visualization
 ├── README.md
-├── requirements.txt
+├── requirements.txt ## packages required to run application locally
 └── .gitignore
 ```
 
