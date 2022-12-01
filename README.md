@@ -1,8 +1,58 @@
 # PJM Day-Ahead Forecasting Tool
-## Web application
-Live demo: https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/
 
-To run the App locally:
+## Table of Contents
+1. [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
+2. [Application Overview](#overview)
+3. [Application Architecture](#architecture)
+4. [How to Use Application](#usage)
+5. [Github Folder Structure](#structure)
+6. [Running Locally](#local)
+
+
+## Web Application
+**Live Application:** [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
+
+![plot](images/Dashboard-Overview.png)
+
+<a name="overview"></a>
+## Application Overview
+PJM is a regional transmission organization (RTO) that manages transmission of electricity for 21 utilities in mid-Atlantic and mid-west states of the US. Each utility in PJM’s territory comprises its own transmission zone. PJM and its member utilities use load forecasts to allocate capacity efficiently, affordably, safely, and reliably. Accurate load forecasting is integral to maintaining a positive reputation with customers, preventing litigation issues, and keeping unexpected/emergency costs down. This visualization tool allows users to interact with the load forecasts. It automatically pulls in weather forecasts to engineer the predictor variables that feed into the final XGBoost models to predict load. The tool is built in Streamlit and utilitizes Folium for mapping and Plotly for interactivity. 
+
+<a name="architecture"></a>
+## Application Architecture
+![plot](images/App-Architecture.png)
+
+<a name="usage"></a>
+## How to Use Application
+1. Open application - [Streamlit Dashboard](https://qhu75-dva-project-load-streamlit-qhu-vk0cvd.streamlit.app/)
+2. Select a date parameter to see predictions for that time - **will default to current date**
+3. Select one or more zones to see specific areas - **will default to all zones**
+    - Note: you can also click the circle on the map to select a specific zone
+4. Select a specific hour to see system load - **will update real time load on graph**
+5. Hover over each zone to view peak load and other factors that may contribute to this load
+
+
+<a name="structure"></a>
+## GitHub Folders/Files
+```bash
+├── PJM Load Forecast Visualizer.twb
+├── forecastPJMLoad.py
+├── load_streamlit.py
+├── model_neuralprophet.py ## Legacy
+├── model_np.py ## Legacy
+├── model_prophet.py ## Legacy
+├── model_xgb.py
+├── Data
+├── images
+├── models
+├── output
+├── README.md
+├── requirements.txt
+└── .gitignore
+```
+
+<a name="local"></a>
+## Running App Locally (optional)
 1. Install dependencies
 ```
 pip install -r requirements.txt
@@ -12,38 +62,4 @@ pip install -r requirements.txt
 streamlit run load_streamlit.py
 ```
 Now you can view the App locally: <http://localhost:8501/>
-
-## Update models
-* To train the NeuralProphet model
-```
-python model_neuralprophet.py
-```
-
-## PJM Load Forecast Visualizer by Tableau (Option 2)
-
-### Prerequisites
-1. Tableau Desktop
-2. Python 3.X
-3. Packages: pandas, numpy, requests, json, datetime, xgboost, sklearn
-
-## To Use Application
-### 1. To Link Tableau Viz to Data Sources
-*Note: this just needs to be done once on initial setup unless you rename/move a folder afterward*
-1. Clone or download repo
-2. Once cloned/unzipped, open up the Tableau viz (```DVA-Project/PJM Load Forecast Visualizer.twb```)
-3. On the ‘Extract Not Found’ window make sure ‘Locate the extract’ (default) is selected and click ‘OK’
-    
-    <img width="539" alt="Screen Shot 2022-11-16 at 4 59 38 PM" src="https://user-images.githubusercontent.com/116284163/202312998-734f0ddc-db7e-429b-a395-0de47c394d76.png">
-4. In the ‘Locate Extract’ file browser navigate to ```DVA-Project/output``` and open the ```zone_mapping.csv+ (Multiple Connections).hyper``` file
-    
-    <img width="356" alt="Screen Shot 2022-11-16 at 5 00 21 PM" src="https://user-images.githubusercontent.com/116284163/202313086-417b8457-4baa-4c1f-9666-38df9a75fbd7.png">
-
-
-### 2. To Update Forecast
-1. Within the ```DVA-Project``` folder, execute ```forecastPJMLoad.py``` file to create new PJM forecast output files
-2. In the Tableau tool (```DVA-Project/PJM Load Forecast Visualizer.twb```), navigate to the top menu and select ```Data>Refresh All Extracts...``` and click 'Refresh' in the pop-up
-    
-    <img width="485" alt="Refresh-data" src="https://user-images.githubusercontent.com/116284163/202313386-f3e7c0e3-1204-4fda-acd2-1da6bbb809e6.png">
-3. The map will automatically update and use the new forecast
-
 
