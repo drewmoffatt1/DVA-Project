@@ -7,6 +7,7 @@ from model_np import ModelNP
 from model_xgb import ModelXGB
 from datetime import timedelta
 import datetime
+from pytz import timezone
 import folium
 from streamlit_folium import st_folium
 import branca.colormap as cm
@@ -140,6 +141,8 @@ st.sidebar.header('PJM Day-Ahead Forecasting Tool')
 #                              help='XGBoost model is based on weather forecast. '
 #                                   'NeuralProphet model based on both weather forcast and 7-days historical records')
 model = 'XGBoost'
+tz = timezone('EST')
+date_d = datetime.datetime.now(tz).date() + timedelta(1)
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
@@ -162,7 +165,7 @@ if model=='neuralprophet':
     #pred_all = pred_all.set_index('hour').reset_index()
     pred_all.index = pred_all['hour'].values
 elif model=='XGBoost':
-    date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today(),
+    date_s = st.sidebar.date_input('Select Date:', value=date_d,
                                    help='Recent day if the weather forecast is available.')
     try:
         pred_all = forecasting(zones, date=date_s, model='XGBoost')
