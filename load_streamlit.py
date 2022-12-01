@@ -142,7 +142,7 @@ st.sidebar.header('PJM Day-Ahead Forecasting Tool')
 #                                   'NeuralProphet model based on both weather forcast and 7-days historical records')
 model = 'XGBoost'
 tz = timezone('EST')
-date_d = datetime.datetime.now(tz).date() + timedelta(1)
+date_d = datetime.datetime.now(tz) + timedelta(1)
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
@@ -209,7 +209,7 @@ else:
 #     st.experimental_rerun()
 
 #st.write(st.session_state)
-hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")),
+hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(date_d.hour),
                          help='The realtime load will shown on the map and the trend on the cards.')
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
