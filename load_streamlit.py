@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.colors
-from model_np import ModelNP
+#from model_np import ModelNP
 from model_xgb import ModelXGB
 from datetime import timedelta
 import datetime
+from pytz import timezone
 import folium
 from streamlit_folium import st_folium
 import branca.colormap as cm
@@ -20,16 +21,18 @@ template = """
 <html lang="en">
 <body>
 <div class='my-legend'>
-<div class='legend-title'>Node size by peak load</div>
 <div class='legend-scale'>
   <ul class='legend-labels'>
-    <li><span style='background:#008000;'></span></li>
-    <li><span style='background:#FF7F50;'></span>50mw</li>
-    <li><span style='background:#FF7F50;'></span></li>
-    <li><span style='background:#FF7F50;'></span>15,000mw</li>
+    <li>&nbsp<span style='background:#008000;'></span></li>
+    <li>50<span style='background:#FF7F50;'></span></li>
+    <li>&nbsp<span style='background:#FF7F50;'></span></li>
+    <li>&nbsp&nbsp&nbsp&nbsp15,000<span style='background:#FF7F50;'></span></li>
   </ul>
 </div>
+<br>
+<div class='legend-title'>Node size by peak load</div>
 </div>
+
 </body>
 </html>
 <style>
@@ -41,7 +44,7 @@ template = """
     }
   .my-legend .legend-title {
     text-align: left;
-    margin-bottom: 8px;
+    margin-top: 8px;
     font-size: 75%;
     }
   .my-legend .legend-scale ul {
@@ -49,6 +52,7 @@ template = """
     padding: 0;
     float: left;
     list-style: none;
+    height: 20px;
     }
   .my-legend .legend-scale ul li {
     display: block;
@@ -131,11 +135,14 @@ zmap, zones = load_data()
 ###########
 ## side bar
 st.sidebar.header('PJM Day-Ahead Forecasting Tool')
-model = st.sidebar.selectbox('Choose model:',
-                             ('XGBoost', 'neuralprophet'),
-                             index=0,
-                             help='XGBoost model is based on weather forecast. '
-                                  'NeuralProphet model based on both weather forcast and 7-days historical records')
+# model = st.sidebar.selectbox('Choose model:',
+#                              ('XGBoost', 'neuralprophet'),
+#                              index=0,
+#                              help='XGBoost model is based on weather forecast. '
+#                                   'NeuralProphet model based on both weather forcast and 7-days historical records')
+model = 'XGBoost'
+tz = timezone('EST')
+date_d = datetime.datetime.now(tz) + timedelta(1)
 
 if model=='neuralprophet':
     uploaded_file = st.sidebar.file_uploader("Upload metered hourly load (at least 7 days)")
@@ -158,7 +165,7 @@ if model=='neuralprophet':
     #pred_all = pred_all.set_index('hour').reset_index()
     pred_all.index = pred_all['hour'].values
 elif model=='XGBoost':
-    date_s = st.sidebar.date_input('Select Date:', value=datetime.date.today(),
+    date_s = st.sidebar.date_input('Select Date:', value=date_d,
                                    help='Recent day if the weather forecast is available.')
     try:
         pred_all = forecasting(zones, date=date_s, model='XGBoost')
@@ -202,7 +209,7 @@ else:
 #     st.experimental_rerun()
 
 #st.write(st.session_state)
-hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(datetime.datetime.now().strftime("%H")),
+hour = st.sidebar.slider('Select Hour:', min_value=0, max_value=23, value=int(date_d.hour),
                          help='The realtime load will shown on the map and the trend on the cards.')
 time_s = datetime.datetime(date_s.year, date_s.month, date_s.day, int(hour), 0)
 
@@ -246,7 +253,7 @@ if model == 'XGBoost':
 elif model == 'neuralprophet':
     pred_subset, hist_h = update_by_zone_date(pred_all, zone_s, date_s, hrl=hrl)
 
-if pred_subset.shape[0] > 0:
+if pred_all.shape[0] > 0:
     st.sidebar.success('Forecasting on all zones finished!', icon="✅")
 
 
